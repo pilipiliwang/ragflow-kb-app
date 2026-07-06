@@ -4,9 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RAGFlow 知识库问答</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-    <script src="/app.js" defer></script>
+    <script src="./api.js" defer></script>
+    <script src="./app.js" defer></script>
   </head>
   <body>
     <div class="shell">
@@ -16,7 +17,7 @@
             <h1>知识库问答</h1>
             <p id="statusText">连接中...</p>
           </div>
-          <a class="icon-button" href="/admin" title="后台">
+          <a class="icon-button" href="./admin.html" title="后台">
             <i data-lucide="settings"></i>
           </a>
         </div>
@@ -60,7 +61,10 @@
             <h2>RAG 搜索问答 vs 直接大模型问答</h2>
             <p>同一个问题会同时走 RAGFlow 知识库和直接模型，便于对比差异。</p>
           </div>
-          <button class="text-button danger" id="logoutButton" type="button">退出</button>
+          <div class="button-row">
+            <a class="secondary-button link-button" href="./login.html">连接后端</a>
+            <button class="text-button danger" id="logoutButton" type="button">退出</button>
+          </div>
         </header>
 
         <section class="question-panel">

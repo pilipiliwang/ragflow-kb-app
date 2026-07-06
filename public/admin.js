@@ -29,14 +29,15 @@ function createIcons() {
 }
 
 async function requestJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (response.status === 401) {
-    window.location.href = "/login";
-    throw new Error("Access required");
+  try {
+    return await window.ragKbApi.json(url, options);
+  } catch (error) {
+    if (error.status === 401) {
+      window.location.href = "./login.html";
+      throw new Error("Access required");
+    }
+    throw error;
   }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-  return payload;
 }
 
 function escapeHtml(value) {
@@ -188,7 +189,7 @@ async function loadQa() {
 
 async function logout() {
   await requestJson("/api/logout", { method: "POST" }).catch(() => {});
-  window.location.href = "/login";
+  window.location.href = "./login.html";
 }
 
 els.saveSettingsButton.addEventListener("click", () => saveSettings().catch((error) => log(error.message)));

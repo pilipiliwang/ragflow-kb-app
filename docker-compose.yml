@@ -11,6 +11,8 @@ services:
       APP_SECRET: ${APP_SECRET:-change-this-to-a-long-random-secret}
       APP_INVITE_CODES: ${APP_INVITE_CODES:-dev-invite}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-Lax}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4317,http://127.0.0.1:4317,https://pilipiliwang.github.io}
       RAGFLOW_BASE_URL: ${RAGFLOW_BASE_URL:-http://ragflow-server:9380}
       RAGFLOW_API_KEY: ${RAGFLOW_API_KEY:-}
       RAGFLOW_DATASET_NAME: ${RAGFLOW_DATASET_NAME:-web-materials}

@@ -44,14 +44,15 @@ function setBusy(value) {
 }
 
 async function requestJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (response.status === 401) {
-    window.location.href = "/login";
-    throw new Error("Access required");
+  try {
+    return await window.ragKbApi.json(url, options);
+  } catch (error) {
+    if (error.status === 401) {
+      window.location.href = "./login.html";
+      throw new Error("Access required");
+    }
+    throw error;
   }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-  return payload;
 }
 
 function escapeHtml(value) {
@@ -263,7 +264,7 @@ async function askCompare() {
 
 async function logout() {
   await requestJson("/api/logout", { method: "POST" }).catch(() => {});
-  window.location.href = "/login";
+  window.location.href = "./login.html";
 }
 
 els.uploadButton.addEventListener("click", uploadFiles);
@@ -296,5 +297,9 @@ els.dropZone.addEventListener("drop", (event) => {
 
 createIcons();
 Promise.all([loadSettings(), loadSources()]).catch((error) => {
-  els.notice.textContent = error.message;
+  const base = window.ragKbApi.getBaseUrl();
+  const pagesHint = location.hostname.endsWith("github.io") && !base
+    ? "\n这是 GitHub Pages 静态前端，请先点“连接后端”，填写云服务器上的后端 API 地址。"
+    : "";
+  els.notice.textContent = `${error.message}${pagesHint}`;
 });

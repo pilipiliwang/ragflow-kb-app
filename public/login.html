@@ -4,9 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>访问知识库</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-    <script src="/login.js" defer></script>
+    <script src="./api.js" defer></script>
+    <script src="./login.js" defer></script>
   </head>
   <body class="login-body">
     <main class="login-card">
@@ -15,6 +16,8 @@
       </div>
       <h1>访问知识库</h1>
       <p>请输入邀请码。默认本地开发码见 `.env.example`。</p>
+      <label class="field-label" for="apiBaseInput">后端 API 地址</label>
+      <input id="apiBaseInput" class="text-input" placeholder="留空表示当前域名，例如 http://localhost:4317" />
       <label class="field-label" for="codeInput">邀请码</label>
       <input id="codeInput" class="text-input" type="password" autocomplete="current-password" />
       <button id="loginButton" class="primary-button" type="button">

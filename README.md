@@ -53,6 +53,8 @@ Windows PowerShell 可手动复制 `.env.example` 为 `.env`。
 APP_SECRET=一段足够长的随机字符串
 APP_INVITE_CODES=邀请码1,邀请码2
 COOKIE_SECURE=false
+COOKIE_SAMESITE=Lax
+CORS_ORIGINS=http://localhost:4317,http://127.0.0.1:4317,https://pilipiliwang.github.io
 
 RAGFLOW_BASE_URL=http://ragflow-server:9380
 RAGFLOW_API_KEY=你的 RAGFlow API Key
@@ -67,6 +69,14 @@ DIRECT_AI_MODEL=模型名
 `APP_SECRET` 用于加密保存在 SQLite 里的 API key。生产环境不要更换它，否则旧 key 无法解密。
 
 如果已经配置 HTTPS，可以把 `COOKIE_SECURE=true`；如果只是用服务器 IP 和 HTTP 测试，保持 `false`，否则浏览器不会保存邀请码 cookie。
+
+如果用 GitHub Pages 前端连接云服务器后端，后端必须使用 HTTPS，并设置：
+
+```text
+COOKIE_SECURE=true
+COOKIE_SAMESITE=None
+CORS_ORIGINS=https://pilipiliwang.github.io
+```
 
 ## 云服务器部署
 
@@ -92,9 +102,11 @@ docker compose up -d --build
 
 ## GitHub Pages
 
-仓库包含 `pages/` 静态站和 `.github/workflows/pages.yml`。推送到 GitHub 后，GitHub Pages 会部署一个项目说明页。
+仓库包含 `.github/workflows/pages.yml`。推送到 GitHub 后，GitHub Pages 会部署 `public/` 目录里的前端应用。
 
-注意：GitHub Pages 只能托管静态网页，不能运行 Express、SQLite、RAGFlow、文件上传或 API key 加密存储。真正的问答系统仍然需要部署 `rag-kb-app` 服务。
+当前 GitHub Pages 部署的是 `public/` 里的真实前端页面，也就是本地 `http://localhost:4317/` 的应用界面。
+
+注意：GitHub Pages 只能托管静态前端，不能运行 Express、SQLite、RAGFlow、文件上传或 API key 加密存储。页面上的“后端 API 地址”需要填写你云服务器上的 `rag-kb-app` 后端地址。
 
 ## API
 

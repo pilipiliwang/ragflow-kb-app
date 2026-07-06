@@ -75,16 +75,19 @@ export function hasAccess(req) {
 
 export function setAccessCookie(res, code) {
   const secure = process.env.COOKIE_SECURE === "true" ? "; Secure" : "";
+  const sameSite = process.env.COOKIE_SAMESITE || "Lax";
   res.setHeader(
     "Set-Cookie",
-    `${COOKIE_NAME}=${encodeURIComponent(createAccessCookie(code))}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${MAX_AGE_SECONDS}${secure}`
+    `${COOKIE_NAME}=${encodeURIComponent(createAccessCookie(code))}; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=${MAX_AGE_SECONDS}${secure}`
   );
 }
 
 export function clearAccessCookie(res) {
+  const secure = process.env.COOKIE_SECURE === "true" ? "; Secure" : "";
+  const sameSite = process.env.COOKIE_SAMESITE || "Lax";
   res.setHeader(
     "Set-Cookie",
-    `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+    `${COOKIE_NAME}=; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=0${secure}`
   );
 }
 

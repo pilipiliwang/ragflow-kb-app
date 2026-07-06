@@ -1,4 +1,5 @@
 const codeInput = document.querySelector("#codeInput");
+const apiBaseInput = document.querySelector("#apiBaseInput");
 const loginButton = document.querySelector("#loginButton");
 const loginMessage = document.querySelector("#loginMessage");
 
@@ -7,6 +8,7 @@ function createIcons() {
 }
 
 async function login() {
+  window.ragKbApi.setBaseUrl(apiBaseInput.value);
   const code = codeInput.value.trim();
   if (!code) {
     loginMessage.textContent = "请输入邀请码。";
@@ -15,14 +17,14 @@ async function login() {
   loginButton.disabled = true;
   loginMessage.textContent = "正在验证...";
   try {
-    const response = await fetch("/api/access", {
+    const response = await window.ragKbApi.fetch("/api/access", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-    window.location.href = "/";
+    window.location.href = "./index.html";
   } catch (error) {
     loginMessage.textContent = `验证失败：${error.message}`;
   } finally {
@@ -34,4 +36,5 @@ loginButton.addEventListener("click", login);
 codeInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") login();
 });
+apiBaseInput.value = window.ragKbApi.getBaseUrl();
 createIcons();

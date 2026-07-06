@@ -26,6 +26,32 @@ const upload = multer({
 
 const db = await createDatabase(dataFile);
 
+function corsOrigins() {
+  return (process.env.CORS_ORIGINS || "http://localhost:4317,http://127.0.0.1:4317,https://pilipiliwang.github.io")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  const allowed = corsOrigins();
+  return allowed.includes("*") || allowed.includes(origin);
+}
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (isAllowedOrigin(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    res.setHeader("Vary", "Origin");
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  return next();
+});
+
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
