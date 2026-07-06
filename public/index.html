@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAGFlow 知识库问答</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div>
+            <h1>知识库问答</h1>
+            <p id="statusText">连接中...</p>
+          </div>
+          <a class="icon-button" href="/admin" title="后台">
+            <i data-lucide="settings"></i>
+          </a>
+        </div>
+
+        <section class="import-panel">
+          <div class="section-title">
+            <h2>导入材料</h2>
+            <span class="badge">RAGFlow</span>
+          </div>
+          <label class="drop-zone" for="fileInput" id="dropZone">
+            <i data-lucide="file-up"></i>
+            <span>选择或拖入文件</span>
+            <small>上传后进入同一个 RAGFlow dataset</small>
+          </label>
+          <input id="fileInput" type="file" multiple />
+          <button class="primary-button" id="uploadButton" type="button">
+            <i data-lucide="upload-cloud"></i>
+            上传文件
+          </button>
+
+          <label class="field-label" for="urlInput">网页 URL</label>
+          <textarea id="urlInput" rows="4" placeholder="https://www.chuancheng.tech/learn/index.html"></textarea>
+          <button class="secondary-button" id="urlButton" type="button">
+            <i data-lucide="refresh-cw"></i>
+            粘贴并刷新 URL
+          </button>
+        </section>
+
+        <section class="source-list-wrap">
+          <div class="section-title">
+            <h2>资料源</h2>
+            <button class="text-button" id="refreshSourcesButton" type="button">刷新</button>
+          </div>
+          <div id="sourceList" class="source-list"></div>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h2>RAG 搜索问答 vs 直接大模型问答</h2>
+            <p>同一个问题会同时走 RAGFlow 知识库和直接模型，便于对比差异。</p>
+          </div>
+          <button class="text-button danger" id="logoutButton" type="button">退出</button>
+        </header>
+
+        <section class="question-panel">
+          <div class="question-grid">
+            <div>
+              <label class="field-label" for="questionInput">问题</label>
+              <textarea id="questionInput" rows="4" placeholder="例如：家族信托怎么降低受益人挥霍风险？"></textarea>
+            </div>
+            <div class="options-panel">
+              <label class="field-label" for="modelSelect">直接大模型</label>
+              <select id="modelSelect"></select>
+              <label class="toggle">
+                <input id="refreshUrlsToggle" type="checkbox" checked />
+                <span>回答前刷新 URL 源</span>
+              </label>
+              <button class="primary-button" id="askButton" type="button">
+                <i data-lucide="split-square-horizontal"></i>
+                对比问答
+              </button>
+            </div>
+          </div>
+          <div id="notice" class="notice"></div>
+        </section>
+
+        <section class="compare-grid">
+          <article class="answer-card">
+            <div class="section-title">
+              <h2>RAGFlow RAG 问答</h2>
+              <span id="ragMeta" class="badge">未运行</span>
+            </div>
+            <pre id="ragAnswer" class="answer-box">等待提问。</pre>
+            <div>
+              <h3>引用来源</h3>
+              <div id="references" class="references"></div>
+            </div>
+          </article>
+
+          <article class="answer-card">
+            <div class="section-title">
+              <h2>直接大模型问答</h2>
+              <span id="directMeta" class="badge muted-badge">未运行</span>
+            </div>
+            <pre id="directAnswer" class="answer-box">等待提问。</pre>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>知识库后台</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="/admin.js" defer></script>
+  </head>
+  <body>
+    <div class="admin-shell">
+      <header class="topbar admin-topbar">
+        <div>
+          <h1>知识库后台</h1>
+          <p>管理 RAGFlow、模型配置、资料源和问答历史。</p>
+        </div>
+        <div class="button-row">
+          <a class="secondary-button link-button" href="/">返回问答</a>
+          <button class="text-button danger" id="logoutButton" type="button">退出</button>
+        </div>
+      </header>
+
+      <section class="admin-grid">
+        <article class="panel-card">
+          <div class="section-title">
+            <h2>模型与 RAGFlow 配置</h2>
+            <button class="primary-button compact" id="saveSettingsButton" type="button">
+              <i data-lucide="save"></i>
+              保存
+            </button>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>RAGFlow Base URL</span>
+              <input id="ragflowBaseUrl" class="text-input" />
+            </label>
+            <label>
+              <span>RAGFlow API Key</span>
+              <input id="ragflowApiKey" class="text-input" type="password" placeholder="留空则保持不变" />
+            </label>
+            <label>
+              <span>Dataset Name</span>
+              <input id="ragflowDatasetName" class="text-input" />
+            </label>
+            <label>
+              <span>Dataset ID</span>
+              <input id="ragflowDatasetId" class="text-input" placeholder="可留空，系统自动创建/查找" />
+            </label>
+            <label>
+              <span>Chat Name</span>
+              <input id="ragflowChatName" class="text-input" />
+            </label>
+            <label>
+              <span>Chat ID</span>
+              <input id="ragflowChatId" class="text-input" placeholder="可留空，系统自动创建/查找" />
+            </label>
+            <label>
+              <span>RAGFlow Chat Model</span>
+              <input id="ragflowChatModel" class="text-input" placeholder="可留空使用 RAGFlow 默认模型" />
+            </label>
+            <label>
+              <span>Direct AI Base URL</span>
+              <input id="directBaseUrl" class="text-input" />
+            </label>
+            <label>
+              <span>Direct AI API Key</span>
+              <input id="directApiKey" class="text-input" type="password" placeholder="留空则保持不变" />
+            </label>
+            <label>
+              <span>Direct Model</span>
+              <input id="directModel" class="text-input" />
+            </label>
+            <label class="wide">
+              <span>可选模型列表</span>
+              <textarea id="availableModels" rows="3" placeholder="每行一个模型名，主页面可选择"></textarea>
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="secondary-button" id="healthButton" type="button">
+              <i data-lucide="activity"></i>
+              检查健康
+            </button>
+            <button class="secondary-button" id="ensureButton" type="button">
+              <i data-lucide="database"></i>
+              初始化 RAGFlow
+            </button>
+            <button class="secondary-button" id="refreshUrlsButton" type="button">
+              <i data-lucide="refresh-cw"></i>
+              刷新 URL 源
+            </button>
+          </div>
+          <pre id="adminNotice" class="mini-log"></pre>
+        </article>
+
+        <article class="panel-card">
+          <div class="section-title">
+            <h2>资料源</h2>
+            <button class="text-button" id="reloadSourcesButton" type="button">刷新</button>
+          </div>
+          <div id="adminSources" class="admin-list"></div>
+        </article>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-title">
+          <h2>问答历史</h2>
+          <button class="text-button" id="reloadQaButton" type="button">刷新</button>
+        </div>
+        <div id="qaHistory" class="history-list"></div>
+      </section>
+    </div>
+  </body>
+</html>

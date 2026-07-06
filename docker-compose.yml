@@ -1,0 +1,32 @@
+services:
+  rag-kb-app:
+    build: .
+    container_name: rag-kb-app
+    restart: unless-stopped
+    ports:
+      - "4317:4317"
+    environment:
+      PORT: "4317"
+      SQLITE_PATH: /data/app.sqlite
+      APP_SECRET: ${APP_SECRET:-change-this-to-a-long-random-secret}
+      APP_INVITE_CODES: ${APP_INVITE_CODES:-dev-invite}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      RAGFLOW_BASE_URL: ${RAGFLOW_BASE_URL:-http://ragflow-server:9380}
+      RAGFLOW_API_KEY: ${RAGFLOW_API_KEY:-}
+      RAGFLOW_DATASET_NAME: ${RAGFLOW_DATASET_NAME:-web-materials}
+      RAGFLOW_CHAT_NAME: ${RAGFLOW_CHAT_NAME:-web-materials-assistant}
+      DIRECT_AI_BASE_URL: ${DIRECT_AI_BASE_URL:-https://api.openai.com/v1}
+      DIRECT_AI_API_KEY: ${DIRECT_AI_API_KEY:-}
+      DIRECT_AI_MODEL: ${DIRECT_AI_MODEL:-}
+    volumes:
+      - rag-kb-data:/data
+    networks:
+      - ragflow
+
+volumes:
+  rag-kb-data:
+
+networks:
+  ragflow:
+    name: ragflow
+    external: true
