@@ -18,8 +18,10 @@
       <p>请输入邀请码。默认本地开发码见 `.env.example`。</p>
       <label class="field-label" for="apiBaseInput">后端 API 地址</label>
       <input id="apiBaseInput" class="text-input" placeholder="留空表示当前域名，例如 http://localhost:4317" />
+      <label class="field-label" for="apiKeyInput">外部 API Key</label>
+      <input id="apiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="本机/云端 API 方式访问时填写" />
       <label class="field-label" for="codeInput">邀请码</label>
-      <input id="codeInput" class="text-input" type="password" autocomplete="current-password" />
+      <input id="codeInput" class="text-input" type="password" autocomplete="current-password" placeholder="使用 API Key 时可留空" />
       <button id="loginButton" class="primary-button" type="button">
         <i data-lucide="log-in"></i>
         进入

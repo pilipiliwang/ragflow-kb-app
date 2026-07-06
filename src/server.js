@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
-import { clearAccessCookie, hasAccess, requireAccess, requireExternalApiKey, requirePageAccess, setAccessCookie, verifyInviteCode } from "./auth.js";
+import { clearAccessCookie, hasAccess, requireExternalApiKey, requirePageAccess, setAccessCookie, verifyExternalApiKey, verifyInviteCode } from "./auth.js";
 import { createDatabase } from "./database.js";
 import { compareAnswers } from "./compareService.js";
 import { randomId } from "./crypto.js";
@@ -223,6 +223,13 @@ app.post("/api/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
+function requireAccessOrApiKey(req, res, next) {
+  if (hasAccess(req)) return next();
+  const settings = db.getSettings({ includeSecrets: true });
+  if (verifyExternalApiKey(req, settings)) return next();
+  return res.status(401).json({ error: "Access code or API key required." });
+}
+
 const apiV1 = express.Router();
 apiV1.use(requireExternalApiKey(db));
 
@@ -337,7 +344,7 @@ apiV1.get("/jobs/:id", (req, res) => {
 
 app.use("/api/v1", apiV1);
 
-app.use("/api", requireAccess);
+app.use("/api", requireAccessOrApiKey);
 
 app.get("/api/me", (req, res) => {
   res.json({ authenticated: hasAccess(req) });

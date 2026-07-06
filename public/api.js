@@ -1,5 +1,6 @@
 (function () {
   const STORAGE_KEY = "ragKbApiBaseUrl";
+  const API_KEY_STORAGE_KEY = "ragKbApiKey";
 
   function normalizeBaseUrl(value) {
     return String(value || "").trim().replace(/\/+$/, "");
@@ -13,6 +14,21 @@
     return normalizeBaseUrl(
       localStorage.getItem(STORAGE_KEY) || window.RAG_KB_API_BASE_URL || ""
     );
+  }
+
+  function getApiKey() {
+    const queryKey = new URLSearchParams(window.location.search).get("key");
+    if (queryKey) {
+      return setApiKey(queryKey);
+    }
+    return String(localStorage.getItem(API_KEY_STORAGE_KEY) || "").trim();
+  }
+
+  function setApiKey(value) {
+    const normalized = String(value || "").trim();
+    if (normalized) localStorage.setItem(API_KEY_STORAGE_KEY, normalized);
+    else localStorage.removeItem(API_KEY_STORAGE_KEY);
+    return normalized;
   }
 
   function setApiBaseUrl(value) {
@@ -30,10 +46,12 @@
   }
 
   async function apiFetch(path, options = {}) {
+    const apiKey = getApiKey();
     return fetch(buildUrl(path), {
       ...options,
       credentials: "include",
       headers: {
+        ...(apiKey ? { "X-API-Key": apiKey } : {}),
         ...(options.headers || {})
       }
     });
@@ -55,6 +73,8 @@
     fetch: apiFetch,
     json: apiJson,
     getBaseUrl: getApiBaseUrl,
-    setBaseUrl: setApiBaseUrl
+    setBaseUrl: setApiBaseUrl,
+    getApiKey,
+    setApiKey
   };
 })();
