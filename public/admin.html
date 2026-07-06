@@ -73,6 +73,10 @@
               <input id="directModel" class="text-input" />
             </label>
             <label class="wide">
+              <span>外部 API Keys</span>
+              <textarea id="externalApiKeys" rows="3" placeholder="给外部网站调用 /api/v1 使用。每行一个 key，留空则保持不变"></textarea>
+            </label>
+            <label class="wide">
               <span>可选模型列表</span>
               <textarea id="availableModels" rows="3" placeholder="每行一个模型名，主页面可选择"></textarea>
             </label>
@@ -109,6 +113,14 @@
           <button class="text-button" id="reloadQaButton" type="button">刷新</button>
         </div>
         <div id="qaHistory" class="history-list"></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-title">
+          <h2>后台任务</h2>
+          <button class="text-button" id="reloadJobsButton" type="button">刷新</button>
+        </div>
+        <div id="jobsList" class="admin-list"></div>
       </section>
     </div>
   </body>

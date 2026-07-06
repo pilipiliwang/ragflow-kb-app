@@ -17,29 +17,60 @@ function titleFromUrl(url) {
   }
 }
 
+async function waitForParse(source, db, client, datasetId, documentId) {
+  const parsed = await client.waitForDocumentParsed(datasetId, documentId);
+  const ready = parsed.status === "ready";
+  return db.updateSourceStatus(source.id, {
+    status: ready ? "ready" : "parsing",
+    statusMessage: ready
+      ? "Parsed by RAGFlow and ready for retrieval."
+      : "Parse requested; RAGFlow is still processing the document.",
+    refreshedAt: new Date().toISOString()
+  });
+}
+
 export async function importFileSource(db, file) {
   const settings = db.getSettings({ includeSecrets: true });
   const resources = await ensureRagflowResources(db, settings);
   await db.save();
 
-  const uploaded = await resources.client.uploadFile(resources.datasetId, file);
-  const documentId = documentIdFrom(uploaded);
-  await resources.client.parseDocuments(resources.datasetId, [documentId]);
-
-  const source = db.upsertSource({
+  let source = db.upsertSource({
     kind: "file",
     title: titleFromFile(file),
     fileName: file.originalname,
     ragflowDatasetId: resources.datasetId,
-    ragflowDocumentId: documentId,
-    status: "parsing",
-    statusMessage: "Uploaded to RAGFlow and parse requested.",
+    ragflowDocumentId: "",
+    status: "uploading",
+    statusMessage: "Uploading to RAGFlow.",
     size: file.size,
     contentHash: hashValue(file.buffer),
     refreshedAt: new Date().toISOString()
   });
   await db.save();
-  return source;
+
+  try {
+    const uploaded = await resources.client.uploadFile(resources.datasetId, file);
+    const documentId = documentIdFrom(uploaded);
+    source = db.updateSourceStatus(source.id, {
+      title: uploaded?.name || uploaded?.title || source.title,
+      ragflowDocumentId: documentId,
+      status: "parsing",
+      statusMessage: "Uploaded to RAGFlow and parse requested.",
+      refreshedAt: new Date().toISOString()
+    });
+    await db.save();
+    await resources.client.parseDocuments(resources.datasetId, [documentId]);
+    source = await waitForParse(source, db, resources.client, resources.datasetId, documentId);
+    await db.save();
+    return source;
+  } catch (error) {
+    db.updateSourceStatus(source.id, {
+      status: "error",
+      statusMessage: error.message
+    });
+    await db.save();
+    throw error;
+  }
 }
 
 export async function refreshUrlSource(db, url) {
@@ -49,6 +80,22 @@ export async function refreshUrlSource(db, url) {
   await db.save();
 
   const existing = db.getSourceByUrl(normalizedUrl);
+  let source = db.upsertSource({
+    id: existing?.id,
+    kind: "url",
+    title: existing?.title || titleFromUrl(normalizedUrl),
+    url: normalizedUrl,
+    ragflowDatasetId: existing?.ragflow_dataset_id || resources.datasetId,
+    ragflowDocumentId: existing?.ragflow_document_id || "",
+    status: "refreshing",
+    statusMessage: "Refreshing URL in RAGFlow.",
+    size: 0,
+    contentHash: existing?.content_hash || "",
+    refreshedAt: existing?.refreshed_at || null
+  });
+  await db.save();
+
+  let deleteWarning = "";
   if (existing?.ragflow_document_id) {
     try {
       await resources.client.deleteDocument(
@@ -56,32 +103,40 @@ export async function refreshUrlSource(db, url) {
         existing.ragflow_document_id
       );
     } catch (error) {
-      db.updateSourceStatus(existing.id, {
-        status: "refreshing",
-        statusMessage: `Old document deletion failed; continuing refresh: ${error.message}`
-      });
+      deleteWarning = `Old document deletion failed; continuing refresh: ${error.message}`;
+      db.updateSourceStatus(source.id, { statusMessage: deleteWarning });
+      await db.save();
     }
   }
 
-  const uploaded = await resources.client.uploadUrl(resources.datasetId, normalizedUrl);
-  const documentId = documentIdFrom(uploaded);
-  await resources.client.parseDocuments(resources.datasetId, [documentId]);
-
-  const source = db.upsertSource({
-    id: existing?.id,
-    kind: "url",
-    title: uploaded?.name || uploaded?.title || titleFromUrl(normalizedUrl),
-    url: normalizedUrl,
-    ragflowDatasetId: resources.datasetId,
-    ragflowDocumentId: documentId,
-    status: "parsing",
-    statusMessage: "URL imported to RAGFlow and parse requested.",
-    size: 0,
-    contentHash: hashValue(`${normalizedUrl}:${Date.now()}`),
-    refreshedAt: new Date().toISOString()
-  });
-  await db.save();
-  return source;
+  try {
+    const uploaded = await resources.client.uploadUrl(resources.datasetId, normalizedUrl);
+    const documentId = documentIdFrom(uploaded);
+    source = db.updateSourceStatus(source.id, {
+      title: uploaded?.name || uploaded?.title || titleFromUrl(normalizedUrl),
+      ragflowDatasetId: resources.datasetId,
+      ragflowDocumentId: documentId,
+      status: "parsing",
+      statusMessage: [
+        deleteWarning,
+        "URL imported to RAGFlow and parse requested."
+      ].filter(Boolean).join(" "),
+      contentHash: hashValue(`${normalizedUrl}:${Date.now()}`),
+      refreshedAt: new Date().toISOString()
+    });
+    await db.save();
+    await resources.client.parseDocuments(resources.datasetId, [documentId]);
+    source = await waitForParse(source, db, resources.client, resources.datasetId, documentId);
+    await db.save();
+    return source;
+  } catch (error) {
+    db.updateSourceStatus(source.id, {
+      status: "error",
+      statusMessage: error.message
+    });
+    await db.save();
+    throw error;
+  }
 }
 
 export async function refreshAllUrlSources(db) {

@@ -9,7 +9,8 @@ const fields = [
   "directBaseUrl",
   "directApiKey",
   "directModel",
-  "availableModels"
+  "availableModels",
+  "externalApiKeys"
 ];
 
 const els = Object.fromEntries(fields.map((id) => [id, document.querySelector(`#${id}`)]));
@@ -19,10 +20,12 @@ els.ensureButton = document.querySelector("#ensureButton");
 els.refreshUrlsButton = document.querySelector("#refreshUrlsButton");
 els.reloadSourcesButton = document.querySelector("#reloadSourcesButton");
 els.reloadQaButton = document.querySelector("#reloadQaButton");
+els.reloadJobsButton = document.querySelector("#reloadJobsButton");
 els.logoutButton = document.querySelector("#logoutButton");
 els.adminNotice = document.querySelector("#adminNotice");
 els.adminSources = document.querySelector("#adminSources");
 els.qaHistory = document.querySelector("#qaHistory");
+els.jobsList = document.querySelector("#jobsList");
 
 function createIcons() {
   if (window.lucide) window.lucide.createIcons();
@@ -72,7 +75,7 @@ async function loadSettings() {
     if (!els[key]) continue;
     if (key === "availableModels") {
       els[key].value = (settings.availableModels || []).join("\n");
-    } else if (key.endsWith("ApiKey")) {
+    } else if (key.endsWith("ApiKey") || key.endsWith("ApiKeys")) {
       els[key].value = "";
       els[key].placeholder = settings.secrets?.[key]
         ? "已配置，留空则保持不变"
@@ -91,6 +94,7 @@ async function saveSettings() {
   }
   if (!payload.ragflowApiKey) delete payload.ragflowApiKey;
   if (!payload.directApiKey) delete payload.directApiKey;
+  if (!payload.externalApiKeys) delete payload.externalApiKeys;
 
   const saved = await requestJson("/api/settings", {
     method: "POST",
@@ -187,6 +191,33 @@ async function loadQa() {
   `).join("");
 }
 
+async function loadJobs() {
+  const payload = await requestJson("/api/admin/jobs?limit=30");
+  const rows = payload.rows || [];
+  if (!rows.length) {
+    els.jobsList.innerHTML = `<div class="empty">暂无后台任务。</div>`;
+    return;
+  }
+
+  els.jobsList.innerHTML = rows.map((job) => `
+    <article class="source-item">
+      <div class="section-title">
+        <div>
+          <div class="source-title">${escapeHtml(job.type)}</div>
+          <div class="meta-row">
+            <span class="${statusClass(job.status)}">${escapeHtml(job.status)}</span>
+            <span>${Number(job.progress || 0)}%</span>
+            <span>${formatDate(job.updated_at)}</span>
+          </div>
+        </div>
+        <span class="badge muted-badge">${escapeHtml(job.id)}</span>
+      </div>
+      ${job.error ? `<small class="status-error">${escapeHtml(job.error)}</small>` : ""}
+      ${job.result ? `<pre class="mini-log compact-log">${escapeHtml(JSON.stringify(job.result, null, 2))}</pre>` : ""}
+    </article>
+  `).join("");
+}
+
 async function logout() {
   await requestJson("/api/logout", { method: "POST" }).catch(() => {});
   window.location.href = "./login.html";
@@ -198,6 +229,7 @@ els.ensureButton.addEventListener("click", () => ensureRagflow().catch((error) =
 els.refreshUrlsButton.addEventListener("click", () => refreshUrls().catch((error) => log(error.message)));
 els.reloadSourcesButton.addEventListener("click", () => loadSources().catch((error) => log(error.message)));
 els.reloadQaButton.addEventListener("click", () => loadQa().catch((error) => log(error.message)));
+els.reloadJobsButton.addEventListener("click", () => loadJobs().catch((error) => log(error.message)));
 els.logoutButton.addEventListener("click", logout);
 els.adminSources.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-source]");
@@ -205,4 +237,4 @@ els.adminSources.addEventListener("click", (event) => {
 });
 
 createIcons();
-Promise.all([loadSettings(), loadSources(), loadQa()]).catch((error) => log(error.message));
+Promise.all([loadSettings(), loadSources(), loadQa(), loadJobs()]).catch((error) => log(error.message));

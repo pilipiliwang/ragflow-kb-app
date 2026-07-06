@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS = {
   availableModels: process.env.DIRECT_AI_MODEL ? [process.env.DIRECT_AI_MODEL] : []
 };
 
-const SECRET_KEYS = new Set(["ragflowApiKey", "directApiKey"]);
+const SECRET_KEYS = new Set(["ragflowApiKey", "directApiKey", "externalApiKeys"]);
 
 function nowIso() {
   return new Date().toISOString();
@@ -118,6 +118,23 @@ export class AppDatabase {
       );
 
       CREATE INDEX IF NOT EXISTS idx_qa_history_created_at ON qa_history(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        result TEXT,
+        error TEXT,
+        progress INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        started_at TEXT,
+        finished_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_jobs_status_created_at ON jobs(status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
     `);
   }
 
@@ -139,6 +156,9 @@ export class AppDatabase {
     }
     if (process.env.DIRECT_AI_API_KEY && await this.getSettingRaw("directApiKey") === null) {
       this.setSettingValue("directApiKey", process.env.DIRECT_AI_API_KEY, true);
+    }
+    if (process.env.EXTERNAL_API_KEYS && await this.getSettingRaw("externalApiKeys") === null) {
+      this.setSettingValue("externalApiKeys", process.env.EXTERNAL_API_KEYS, true);
     }
   }
 
@@ -309,6 +329,119 @@ export class AppDatabase {
 
   deleteSource(id) {
     this.db.run("DELETE FROM sources WHERE id = ?", [id]);
+  }
+
+  createJob(type, payload = {}) {
+    const id = randomId("job");
+    const timestamp = nowIso();
+    this.db.run(
+      `INSERT INTO jobs (
+        id, type, status, payload, result, error, progress,
+        created_at, updated_at, started_at, finished_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        type,
+        "queued",
+        JSON.stringify(payload || {}),
+        "",
+        "",
+        0,
+        timestamp,
+        timestamp,
+        null,
+        null
+      ]
+    );
+    return this.getJob(id);
+  }
+
+  updateJob(id, fields = {}) {
+    const current = this.getJob(id);
+    if (!current) return null;
+    const status = fields.status ?? current.status;
+    const timestamp = nowIso();
+    const result = Object.hasOwn(fields, "result")
+      ? JSON.stringify(fields.result ?? null)
+      : JSON.stringify(current.result ?? null);
+    const payload = Object.hasOwn(fields, "payload")
+      ? JSON.stringify(fields.payload ?? {})
+      : JSON.stringify(current.payload ?? {});
+    this.db.run(
+      `UPDATE jobs SET
+        status = ?,
+        payload = ?,
+        result = ?,
+        error = ?,
+        progress = ?,
+        updated_at = ?,
+        started_at = ?,
+        finished_at = ?
+       WHERE id = ?`,
+      [
+        status,
+        payload,
+        result,
+        fields.error ?? current.error ?? "",
+        fields.progress ?? current.progress ?? 0,
+        timestamp,
+        fields.startedAt ?? current.started_at ?? null,
+        fields.finishedAt ?? current.finished_at ?? null,
+        id
+      ]
+    );
+    return this.getJob(id);
+  }
+
+  getJob(id) {
+    const statement = this.db.prepare("SELECT * FROM jobs WHERE id = ?");
+    statement.bind([id]);
+    const job = oneObject(statement);
+    return job ? this.parseJob(job) : null;
+  }
+
+  getNextQueuedJob() {
+    return this.parseJob(oneObject(this.db.prepare(
+      "SELECT * FROM jobs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1"
+    )));
+  }
+
+  listJobs({ limit = 50, offset = 0, status = "" } = {}) {
+    const args = [];
+    const where = status ? "WHERE status = ?" : "";
+    if (status) args.push(status);
+    const countStatement = this.db.prepare(`SELECT COUNT(*) AS count FROM jobs ${where}`);
+    if (args.length) countStatement.bind(args);
+    const count = oneObject(countStatement)?.count || 0;
+
+    const statement = this.db.prepare(
+      `SELECT * FROM jobs ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    );
+    statement.bind([...args, limit, offset]);
+    return {
+      count,
+      rows: rowObjects(statement).map((row) => this.parseJob(row))
+    };
+  }
+
+  requeueInterruptedJobs() {
+    this.db.run(
+      `UPDATE jobs SET
+        status = 'queued',
+        error = '',
+        updated_at = ?
+       WHERE status = 'running'`,
+      [nowIso()]
+    );
+  }
+
+  parseJob(row) {
+    if (!row) return null;
+    return {
+      ...row,
+      payload: safeJsonParse(row.payload, {}),
+      result: row.result ? safeJsonParse(row.result, null) : null
+    };
   }
 
   addQaHistory(record) {

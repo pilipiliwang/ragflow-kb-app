@@ -397,6 +397,12 @@ select:focus {
   font-size: 12px;
 }
 
+.compact-log {
+  min-height: 0;
+  max-height: 150px;
+  padding: 10px;
+}
+
 .references {
   margin-top: 8px;
   display: grid;

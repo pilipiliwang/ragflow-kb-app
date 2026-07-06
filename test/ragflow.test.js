@@ -45,3 +45,44 @@ test("RagflowClient wraps upload, parse, and chat requests", async () => {
   assert.equal(answer.references[0].documentId, "doc-web");
   assert.equal(calls.some((call) => call.url.includes("/chunks") && call.method === "POST"), true);
 });
+
+test("RagflowClient retries retryable JSON requests", async () => {
+  let calls = 0;
+  const client = new RagflowClient({
+    ragflowBaseUrl: "http://ragflow.local",
+    ragflowApiKey: "key"
+  }, async () => {
+    calls += 1;
+    if (calls === 1) {
+      return new Response("temporary", { status: 500 });
+    }
+    return jsonResponse([{ id: "ds1", name: "kb" }]);
+  });
+
+  const datasets = await client.listDatasets("kb");
+  assert.equal(calls, 2);
+  assert.equal(datasets[0].id, "ds1");
+});
+
+test("RagflowClient waits for document parse status", async () => {
+  let calls = 0;
+  const client = new RagflowClient({
+    ragflowBaseUrl: "http://ragflow.local",
+    ragflowApiKey: "key"
+  }, async () => {
+    calls += 1;
+    return jsonResponse({
+      documents: [{
+        id: "doc1",
+        run: calls < 2 ? "RUNNING" : "DONE"
+      }]
+    });
+  });
+
+  const result = await client.waitForDocumentParsed("ds1", "doc1", {
+    timeoutMs: 100,
+    pollMs: 1
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(calls, 2);
+});

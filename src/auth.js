@@ -40,9 +40,35 @@ function parseCookies(header = "") {
   );
 }
 
+function configuredApiKeys(settings = {}) {
+  const values = [
+    settings.externalApiKeys,
+    process.env.EXTERNAL_API_KEYS
+  ].filter(Boolean);
+
+  return values
+    .flatMap((value) => String(value).split(/[,\n]/))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function extractApiKey(req) {
+  const authorization = String(req.headers.authorization || "");
+  const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const xApiKey = String(req.headers["x-api-key"] || "").trim();
+  return bearer || xApiKey;
+}
+
 export function verifyInviteCode(code) {
   const normalized = String(code || "").trim();
   return normalized && inviteCodes().includes(normalized);
+}
+
+export function verifyExternalApiKey(req, settings = {}) {
+  const provided = extractApiKey(req);
+  if (!provided) return false;
+  const providedHash = hashValue(provided);
+  return configuredApiKeys(settings).some((key) => hashValue(key) === providedHash);
 }
 
 export function createAccessCookie(code) {
@@ -99,4 +125,12 @@ export function requireAccess(req, res, next) {
 export function requirePageAccess(req, res, next) {
   if (hasAccess(req)) return next();
   return res.redirect("/login");
+}
+
+export function requireExternalApiKey(db) {
+  return (req, res, next) => {
+    const settings = db.getSettings({ includeSecrets: true });
+    if (verifyExternalApiKey(req, settings)) return next();
+    return res.status(401).json({ error: "Valid API key required." });
+  };
 }
