@@ -30,10 +30,11 @@ test("compareAnswers calls RAGFlow and direct model then stores history", async 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, options = {}) => {
     const textUrl = String(url);
-    if (textUrl.startsWith("http://ragflow.mock/api/v1/datasets?")) return response([]);
+    if (textUrl === "http://ragflow.mock/api/v1/datasets" && (!options.method || options.method === "GET")) return response([]);
     if (textUrl.endsWith("/api/v1/datasets") && options.method === "POST") return response({ id: "ds1" });
-    if (textUrl.startsWith("http://ragflow.mock/api/v1/chats?")) return response([]);
+    if (textUrl === "http://ragflow.mock/api/v1/chats" && (!options.method || options.method === "GET")) return response([]);
     if (textUrl.endsWith("/api/v1/chats") && options.method === "POST") return response({ id: "chat1" });
+    if (textUrl.endsWith("/api/v1/chats/chat1") && options.method === "PATCH") return response({ id: "chat1" });
     if (textUrl.endsWith("/api/v1/chat/completions")) {
       return response({
         answer: "RAGFlow answer",

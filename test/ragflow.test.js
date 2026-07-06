@@ -86,3 +86,21 @@ test("RagflowClient waits for document parse status", async () => {
   assert.equal(result.status, "ready");
   assert.equal(calls, 2);
 });
+
+test("RagflowClient surfaces RAGFlow parse progress errors", async () => {
+  const client = new RagflowClient({
+    ragflowBaseUrl: "http://ragflow.local",
+    ragflowApiKey: "key"
+  }, async () => jsonResponse({
+    documents: [{
+      id: "doc1",
+      run: "FAIL",
+      progress_msg: "No default embedding model is set."
+    }]
+  }));
+
+  await assert.rejects(
+    () => client.waitForDocumentParsed("ds1", "doc1", { timeoutMs: 100, pollMs: 1 }),
+    /No default embedding model is set/
+  );
+});

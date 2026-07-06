@@ -45,6 +45,16 @@ function unwrapRagflowJson(json) {
   return json?.data ?? json;
 }
 
+function isNoParsedFileError(error) {
+  return String(error?.message || "").includes("doesn't own parsed file");
+}
+
+function chatDatasetIds(chat) {
+  if (Array.isArray(chat?.dataset_ids)) return chat.dataset_ids;
+  if (Array.isArray(chat?.kb_ids)) return chat.kb_ids;
+  return [];
+}
+
 function documentList(data) {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.documents)) return data.documents;
@@ -180,8 +190,9 @@ export class RagflowClient {
   }
 
   async listDatasets(name) {
-    const data = await this.request(`/api/v1/datasets${queryString({ name })}`);
-    return Array.isArray(data) ? data : data?.datasets || [];
+    const data = await this.request("/api/v1/datasets");
+    const datasets = Array.isArray(data) ? data : data?.datasets || [];
+    return name ? datasets.filter((item) => item.name === name) : datasets;
   }
 
   async createDataset({ name, embeddingModel }) {
@@ -194,8 +205,9 @@ export class RagflowClient {
   }
 
   async listChats(name) {
-    const data = await this.request(`/api/v1/chats${queryString({ name })}`);
-    return Array.isArray(data) ? data : data?.chats || [];
+    const data = await this.request("/api/v1/chats");
+    const chats = Array.isArray(data) ? data : data?.chats || [];
+    return name ? chats.filter((item) => item.name === name) : chats;
   }
 
   async createChat({ name, datasetIds, llmId }) {
@@ -206,6 +218,17 @@ export class RagflowClient {
     if (llmId) payload.llm_id = llmId;
     return this.request("/api/v1/chats", {
       method: "POST",
+      body: payload
+    });
+  }
+
+  async updateChat(chatId, { datasetIds, llmId }) {
+    const payload = {
+      dataset_ids: datasetIds
+    };
+    if (llmId) payload.llm_id = llmId;
+    return this.request(`/api/v1/chats/${chatId}`, {
+      method: "PATCH",
       body: payload
     });
   }
@@ -277,7 +300,13 @@ export class RagflowClient {
       const status = normalizeRunState(document);
       if (status === "ready") return { status: "ready", document };
       if (status === "error") {
-        throw new Error(document?.error || document?.status_message || "RAGFlow document parse failed.");
+        throw new Error(
+          document?.error
+            || document?.status_message
+            || document?.progress_msg
+            || document?.message
+            || "RAGFlow document parse failed."
+        );
       }
       await sleep(options.pollMs ?? this.parsePollMs);
     }
@@ -316,7 +345,7 @@ export async function ensureRagflowResources(db, settings) {
 
   if (!datasetId) {
     const datasets = await client.listDatasets(settings.ragflowDatasetName);
-    const existing = datasets.find((item) => item.name === settings.ragflowDatasetName) || datasets[0];
+    const existing = datasets.find((item) => item.name === settings.ragflowDatasetName);
     const dataset = existing || await client.createDataset({ name: settings.ragflowDatasetName });
     datasetId = dataset.id;
     if (!datasetId) throw new Error("RAGFlow did not return a dataset id.");
@@ -324,17 +353,42 @@ export async function ensureRagflowResources(db, settings) {
   }
 
   let chatId = settings.ragflowChatId;
+  let chat = null;
   if (!chatId) {
     const chats = await client.listChats(settings.ragflowChatName);
-    const existing = chats.find((item) => item.name === settings.ragflowChatName) || chats[0];
-    const chat = existing || await client.createChat({
-      name: settings.ragflowChatName,
-      datasetIds: [datasetId],
-      llmId: settings.ragflowChatModel
-    });
+    const existing = chats.find((item) => item.name === settings.ragflowChatName);
+    if (existing) {
+      chat = existing;
+    } else {
+      try {
+        chat = await client.createChat({
+          name: settings.ragflowChatName,
+          datasetIds: [datasetId],
+          llmId: settings.ragflowChatModel
+        });
+      } catch (error) {
+        if (!isNoParsedFileError(error)) throw error;
+        chat = await client.createChat({
+          name: settings.ragflowChatName,
+          datasetIds: [],
+          llmId: settings.ragflowChatModel
+        });
+      }
+    }
     chatId = chat.id;
     if (!chatId) throw new Error("RAGFlow did not return a chat assistant id.");
     db.setSettingValue("ragflowChatId", chatId, false);
+  }
+
+  if (chatId && datasetId && !chatDatasetIds(chat).includes(datasetId)) {
+    try {
+      await client.updateChat(chatId, {
+        datasetIds: [datasetId],
+        llmId: settings.ragflowChatModel
+      });
+    } catch (error) {
+      if (!isNoParsedFileError(error)) throw error;
+    }
   }
 
   return {
