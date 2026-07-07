@@ -43,6 +43,10 @@ button {
   cursor: pointer;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -257,6 +261,10 @@ svg {
   padding: 0;
 }
 
+.tight-row {
+  justify-content: flex-end;
+}
+
 .text-input,
 textarea,
 select {
@@ -302,8 +310,14 @@ select:focus {
   border-color: var(--accent);
 }
 
-#fileInput {
-  display: none;
+.native-file-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  padding: 10px;
+  font-size: 13px;
 }
 
 .file-preview {
@@ -323,6 +337,7 @@ select:focus {
 
 .file-preview-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   font-size: 13px;
@@ -332,6 +347,15 @@ select:focus {
 .file-preview-row span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.file-preview-row small {
+  white-space: nowrap;
+}
+
+.remove-file-button {
+  min-height: 28px;
+  padding: 0 4px;
 }
 
 .compact-empty {
@@ -399,7 +423,7 @@ select:focus {
 
 .question-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
   gap: 14px;
 }
 
@@ -407,6 +431,27 @@ select:focus {
   display: grid;
   align-content: end;
   gap: 12px;
+}
+
+.direct-config-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.direct-config-panel label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.direct-config-panel label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .toggle {
@@ -430,6 +475,14 @@ select:focus {
   margin-top: 10px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.inline-notice {
+  margin-top: 0;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 8px 10px;
 }
 
 .compare-grid {

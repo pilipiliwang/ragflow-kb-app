@@ -1,6 +1,7 @@
 const state = {
   settings: null,
   sources: [],
+  selectedFiles: [],
   busy: false
 };
 
@@ -9,7 +10,9 @@ const els = {
   fileInput: document.querySelector("#fileInput"),
   dropZone: document.querySelector("#dropZone"),
   filePreview: document.querySelector("#filePreview"),
+  clearFilesButton: document.querySelector("#clearFilesButton"),
   uploadButton: document.querySelector("#uploadButton"),
+  importNotice: document.querySelector("#importNotice"),
   urlInput: document.querySelector("#urlInput"),
   urlButton: document.querySelector("#urlButton"),
   refreshSourcesButton: document.querySelector("#refreshSourcesButton"),
@@ -18,6 +21,14 @@ const els = {
   questionInput: document.querySelector("#questionInput"),
   modelSelect: document.querySelector("#modelSelect"),
   modelHint: document.querySelector("#modelHint"),
+  toggleDirectConfigButton: document.querySelector("#toggleDirectConfigButton"),
+  directConfigPanel: document.querySelector("#directConfigPanel"),
+  directPresetSelect: document.querySelector("#directPresetSelect"),
+  directBaseUrlInput: document.querySelector("#directBaseUrlInput"),
+  directApiKeyInput: document.querySelector("#directApiKeyInput"),
+  directModelInput: document.querySelector("#directModelInput"),
+  saveDirectConfigButton: document.querySelector("#saveDirectConfigButton"),
+  directConfigNotice: document.querySelector("#directConfigNotice"),
   refreshUrlsToggle: document.querySelector("#refreshUrlsToggle"),
   askButton: document.querySelector("#askButton"),
   notice: document.querySelector("#notice"),
@@ -39,9 +50,11 @@ function setBusy(value) {
     els.urlButton,
     els.refreshSourcesButton,
     els.askButton,
-    els.logoutButton
+    els.logoutButton,
+    els.clearFilesButton,
+    els.saveDirectConfigButton
   ].forEach((button) => {
-    button.disabled = value;
+    if (button) button.disabled = value;
   });
 }
 
@@ -98,6 +111,10 @@ function formatBytes(value) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function fileKey(file) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
 }
 
 function statusClass(status) {
@@ -172,9 +189,17 @@ function renderSettings() {
   `).join("");
   els.modelSelect.value = state.settings?.directModel || "";
   const configured = state.settings?.secrets?.directApiKey && state.settings?.directModel;
+  els.directBaseUrlInput.value = state.settings?.directBaseUrl || "https://api.openai.com/v1";
+  els.directModelInput.value = state.settings?.directModel || "";
+  els.directApiKeyInput.value = "";
+  els.directApiKeyInput.placeholder = state.settings?.secrets?.directApiKey
+    ? "已配置；留空则保持不变"
+    : "请输入 OpenAI-compatible API Key";
+  els.directConfigPanel.hidden = false;
+  els.toggleDirectConfigButton.textContent = "收起配置";
   els.modelHint.innerHTML = configured
-    ? `直接模型已配置：${escapeHtml(state.settings.directModel)}`
-    : `未配置直接大模型。RAGFlow 左栏仍可用；右栏需要到 <a href="./admin.html">后台</a> 填 Direct AI API Key 和 Direct Model。`;
+    ? `直接模型已配置：${escapeHtml(state.settings.directModel)}。下方可以随时更换 Base URL、API Key 或模型名。`
+    : `未配置直接大模型。RAGFlow 左栏仍可用；右栏需要先在这里填 API Key、Base URL 和模型名。`;
 }
 
 async function loadSettings() {
@@ -189,47 +214,70 @@ async function loadSources() {
 }
 
 function renderSelectedFiles() {
-  const files = [...els.fileInput.files];
+  const files = state.selectedFiles;
   if (!files.length) {
     els.filePreview.className = "file-preview empty compact-empty";
-    els.filePreview.textContent = "尚未选择文件。";
+    els.filePreview.textContent = "尚未选择文件。可以一次多选，也可以分多次选择后一起上传。";
     return;
   }
 
   els.filePreview.className = "file-preview";
   els.filePreview.innerHTML = `
     <div class="file-preview-head">待上传 ${files.length} 个文件</div>
-    ${files.map((file) => `
+    ${files.map((file, index) => `
       <div class="file-preview-row">
         <span>${escapeHtml(displayText(file.name))}</span>
         <small>${formatBytes(file.size)}</small>
+        <button class="text-button remove-file-button" type="button" data-remove-file="${index}">移除</button>
       </div>
     `).join("")}
   `;
 }
 
+function addPendingFiles(fileList) {
+  const current = new Set(state.selectedFiles.map(fileKey));
+  for (const file of [...fileList]) {
+    const key = fileKey(file);
+    if (!current.has(key)) {
+      state.selectedFiles.push(file);
+      current.add(key);
+    }
+  }
+  els.fileInput.value = "";
+  renderSelectedFiles();
+  els.importNotice.textContent = state.selectedFiles.length
+    ? `已加入 ${state.selectedFiles.length} 个待上传文件。确认后点击“上传文件”。`
+    : "";
+}
+
+function clearPendingFiles({ keepNotice = false } = {}) {
+  state.selectedFiles = [];
+  els.fileInput.value = "";
+  renderSelectedFiles();
+  if (!keepNotice) els.importNotice.textContent = "";
+}
+
 async function uploadFiles() {
-  const files = [...els.fileInput.files];
+  const files = state.selectedFiles;
   if (!files.length) {
-    els.notice.textContent = "请选择文件。";
+    els.importNotice.textContent = "请选择文件。可以一次多选，或分多次选择后一起上传。";
     return;
   }
 
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
   setBusy(true);
-  els.notice.textContent = "正在上传到 RAGFlow 并触发解析...";
+  els.importNotice.textContent = `正在上传 ${files.length} 个文件到 RAGFlow，并触发解析...`;
   try {
     const payload = await requestJson("/api/sources/upload", {
       method: "POST",
       body: form
     });
-    els.notice.textContent = summarizeImport(payload.imported || [], "文件");
-    els.fileInput.value = "";
-    renderSelectedFiles();
+    els.importNotice.textContent = summarizeImport(payload.imported || [], "文件");
+    clearPendingFiles({ keepNotice: true });
     await loadSources();
   } catch (error) {
-    els.notice.textContent = `上传失败：${error.message}`;
+    els.importNotice.textContent = `上传失败：${error.message}`;
   } finally {
     setBusy(false);
   }
@@ -290,6 +338,69 @@ function summarizeImport(items, label = "资料") {
     return `${index + 1}. ${name}：${statusLabel(item.status)}${message ? `，${message}` : ""}`;
   }));
   return lines.join("\n");
+}
+
+function applyDirectPreset() {
+  const option = els.directPresetSelect.selectedOptions[0];
+  if (!option || !option.value) return;
+  els.directModelInput.value = option.value;
+  els.directBaseUrlInput.value = option.dataset.baseUrl || els.directBaseUrlInput.value;
+  els.directConfigNotice.textContent = `已填入 ${option.textContent.trim()}，请补充对应 API Key 后保存。`;
+}
+
+function toggleDirectConfig() {
+  const nextHidden = !els.directConfigPanel.hidden;
+  els.directConfigPanel.hidden = nextHidden;
+  els.toggleDirectConfigButton.textContent = nextHidden ? "配置 API Key / 模型" : "收起配置";
+}
+
+async function saveDirectConfig() {
+  const directBaseUrl = els.directBaseUrlInput.value.trim();
+  const directModel = els.directModelInput.value.trim() || els.modelSelect.value.trim();
+  const directApiKey = els.directApiKeyInput.value.trim();
+
+  if (!directBaseUrl) {
+    els.directConfigNotice.textContent = "请填写 Base URL。";
+    return;
+  }
+  if (!directModel) {
+    els.directConfigNotice.textContent = "请填写模型名，例如 deepseek-chat 或 qwen-plus。";
+    return;
+  }
+  if (!directApiKey && !state.settings?.secrets?.directApiKey) {
+    els.directConfigNotice.textContent = "请填写 API Key。";
+    return;
+  }
+
+  const availableModels = [...new Set([
+    ...(state.settings?.availableModels || []),
+    directModel
+  ].filter(Boolean))];
+  const payload = {
+    directBaseUrl,
+    directModel,
+    availableModels
+  };
+  if (directApiKey) payload.directApiKey = directApiKey;
+
+  setBusy(true);
+  els.directConfigNotice.textContent = "正在保存直接大模型配置...";
+  try {
+    state.settings = await requestJson("/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    renderSettings();
+    els.modelSelect.value = directModel;
+    els.directConfigPanel.hidden = false;
+    els.toggleDirectConfigButton.textContent = "收起配置";
+    els.directConfigNotice.textContent = "已保存直接大模型配置。现在可以运行右侧直接模型对比。";
+  } catch (error) {
+    els.directConfigNotice.textContent = `保存失败：${error.message}`;
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function saveSelectedModel() {
@@ -381,7 +492,20 @@ els.urlButton.addEventListener("click", addUrls);
 els.refreshSourcesButton.addEventListener("click", loadSources);
 els.askButton.addEventListener("click", askCompare);
 els.logoutButton.addEventListener("click", logout);
-els.fileInput.addEventListener("change", renderSelectedFiles);
+els.clearFilesButton.addEventListener("click", () => clearPendingFiles());
+els.fileInput.addEventListener("change", () => addPendingFiles(els.fileInput.files));
+els.filePreview.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-file]");
+  if (!button) return;
+  state.selectedFiles.splice(Number(button.dataset.removeFile), 1);
+  renderSelectedFiles();
+  els.importNotice.textContent = state.selectedFiles.length
+    ? `待上传列表还有 ${state.selectedFiles.length} 个文件。`
+    : "已清空待上传文件。";
+});
+els.toggleDirectConfigButton.addEventListener("click", toggleDirectConfig);
+els.directPresetSelect.addEventListener("change", applyDirectPreset);
+els.saveDirectConfigButton.addEventListener("click", saveDirectConfig);
 els.sourceList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-source]");
   if (button) deleteSource(button.dataset.deleteSource);
@@ -406,8 +530,7 @@ els.questionInput.addEventListener("keydown", (event) => {
 });
 
 els.dropZone.addEventListener("drop", (event) => {
-  els.fileInput.files = event.dataTransfer.files;
-  renderSelectedFiles();
+  addPendingFiles(event.dataTransfer.files);
 });
 
 createIcons();

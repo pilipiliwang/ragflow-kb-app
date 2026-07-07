@@ -30,14 +30,21 @@
           <label class="drop-zone" for="fileInput" id="dropZone">
             <i data-lucide="file-up"></i>
             <span>选择或拖入文件</span>
-            <small>选中文件后会先在这里预览，上传成功后进入当前知识库</small>
+            <small>可多选，也可以分多次选择；文件会先加入待上传列表</small>
           </label>
-          <input id="fileInput" type="file" multiple />
+          <input id="fileInput" class="native-file-input" type="file" multiple />
           <div id="filePreview" class="file-preview empty compact-empty">尚未选择文件。</div>
+          <div class="button-row tight-row">
+            <button class="secondary-button compact" id="clearFilesButton" type="button">
+              <i data-lucide="x"></i>
+              清空待上传
+            </button>
+          </div>
           <button class="primary-button" id="uploadButton" type="button">
             <i data-lucide="upload-cloud"></i>
             上传文件
           </button>
+          <div id="importNotice" class="notice inline-notice"></div>
 
           <label class="field-label" for="urlInput">网页 URL</label>
           <textarea id="urlInput" rows="4" placeholder="每行一个网址；未粘贴时不会导入网页。"></textarea>
@@ -78,10 +85,38 @@
             <div class="options-panel">
               <div class="model-head">
                 <label class="field-label" for="modelSelect">直接大模型</label>
-                <a class="text-button compact-link" href="./admin.html">配置</a>
+                <button class="text-button compact-link" id="toggleDirectConfigButton" type="button">配置 API Key / 模型</button>
               </div>
               <select id="modelSelect"></select>
               <div id="modelHint" class="model-hint"></div>
+              <div id="directConfigPanel" class="direct-config-panel">
+                <label>
+                  <span>常用模型</span>
+                  <select id="directPresetSelect">
+                    <option value="">手动填写</option>
+                    <option value="deepseek-chat" data-base-url="https://api.deepseek.com/v1">DeepSeek Chat</option>
+                    <option value="qwen-plus" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">通义千问 qwen-plus</option>
+                    <option value="gpt-4o-mini" data-base-url="https://api.openai.com/v1">OpenAI gpt-4o-mini</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Base URL</span>
+                  <input id="directBaseUrlInput" class="text-input" placeholder="例如 https://api.deepseek.com/v1" />
+                </label>
+                <label>
+                  <span>API Key</span>
+                  <input id="directApiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="只保存到本机后端，接口不会明文回显" />
+                </label>
+                <label>
+                  <span>模型名</span>
+                  <input id="directModelInput" class="text-input" placeholder="例如 deepseek-chat / qwen-plus" />
+                </label>
+                <button class="secondary-button compact" id="saveDirectConfigButton" type="button">
+                  <i data-lucide="save"></i>
+                  保存直接模型配置
+                </button>
+                <div id="directConfigNotice" class="model-hint"></div>
+              </div>
               <label class="toggle">
                 <input id="refreshUrlsToggle" type="checkbox" checked />
                 <span>回答前刷新 URL 源</span>
