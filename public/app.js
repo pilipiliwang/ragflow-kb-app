@@ -177,14 +177,13 @@ function renderSources() {
     const rawMessage = displayText(source.status_message || "");
     const message = simplifySourceMessage(rawMessage);
     return `
-      <article class="source-item">
+      <article class="source-item" data-status="${escapeHtml(source.status || "")}">
         <div class="source-main">
-          <div>
-            <div class="source-title">${escapeHtml(title)}</div>
-            <div class="meta-row">
+          <div class="source-copy">
+            <div class="source-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+            <div class="source-meta">
               <span>${sourceKindLabel(source.kind)}</span>
-              <span class="${statusClass(source.status)}">${statusLabel(source.status)}</span>
-              <span>${sourceUseLabel(source.status)}</span>
+              <span class="source-status ${statusClass(source.status)}">${statusLabel(source.status)}</span>
               <span>${formatDate(source.refreshed_at || source.updated_at)}</span>
               ${source.size ? `<span>${formatBytes(source.size)}</span>` : ""}
             </div>
@@ -193,7 +192,7 @@ function renderSources() {
             <i data-lucide="trash-2"></i>
           </button>
         </div>
-        ${message ? `<small title="${escapeHtml(rawMessage)}">${escapeHtml(message)}</small>` : ""}
+        ${message && source.status !== "ready" ? `<small class="source-message" title="${escapeHtml(rawMessage)}">${escapeHtml(message)}</small>` : ""}
       </article>
     `;
   }).join("");
