@@ -110,6 +110,65 @@ function Stop-AppListener {
   }
 }
 
+function Get-RagflowApiToken {
+  try {
+    $output = docker exec -e MYSQL_PWD=infini_rag_flow docker-mysql-1 mysql --skip-column-names --batch --silent -uroot rag_flow -e "SELECT token FROM api_token WHERE token IS NOT NULL AND token <> '' ORDER BY create_date ASC LIMIT 1;"
+    $token = $output | Where-Object { $_ -match "^ragflow-" } | Select-Object -First 1
+    return ([string]$token).Trim()
+  } catch {
+    return ""
+  }
+}
+
+function Invoke-AppJson {
+  param(
+    [string]$Path,
+    [string]$Method = "GET",
+    [object]$Body = $null
+  )
+
+  $headers = @{ "X-API-Key" = $LocalApiKey }
+  if ($Body -ne $null) {
+    $headers["Content-Type"] = "application/json"
+  }
+  $options = @{
+    UseBasicParsing = $true
+    Uri = "$AppUrl$Path"
+    Method = $Method
+    Headers = $headers
+    TimeoutSec = 60
+  }
+  if ($Body -ne $null) {
+    $options.Body = ($Body | ConvertTo-Json -Depth 8)
+  }
+  return Invoke-WebRequest @options
+}
+
+function Sync-RagflowAppSettings {
+  $ragflowToken = Get-RagflowApiToken
+  if (!$ragflowToken) {
+    Write-Step "No RAGFlow API token found in local RAGFlow database. Configure it in the App admin page."
+    return
+  }
+
+  Write-Step "Syncing App RAGFlow settings from local RAGFlow..."
+  Invoke-AppJson -Path "/api/settings" -Method "POST" -Body @{
+    ragflowBaseUrl = "http://127.0.0.1:9380"
+    ragflowApiKey = $ragflowToken
+    ragflowDatasetName = "web-materials"
+    ragflowDatasetId = ""
+    ragflowChatName = "web-materials-assistant"
+    ragflowChatId = ""
+  } | Out-Null
+
+  try {
+    Invoke-AppJson -Path "/api/admin/ragflow/ensure" -Method "POST" | Out-Null
+    Write-Step "App RAGFlow dataset and chat are ready."
+  } catch {
+    Write-Step "App RAGFlow settings were saved, but dataset/chat ensure failed. Check the admin health page."
+  }
+}
+
 function Start-DockerDesktop {
   $dockerDesktop = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
   if (Test-Path -LiteralPath $dockerDesktop) {
@@ -204,6 +263,7 @@ function Start-App {
 Wait-DockerReady
 Start-Ragflow
 Start-App
+Sync-RagflowAppSettings
 
 Write-Host ""
 Write-Host "RAG knowledge service is ready."
