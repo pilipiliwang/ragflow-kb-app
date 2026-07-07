@@ -3,13 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RAGFlow 知识库问答</title>
+    <title>维睿塔 RAG 开发环境</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
     <script src="./api.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
   <body>
+    <div class="copyright-bar">
+      <span>维睿塔数字科技RAG开发环境</span>
+      <span>调用联系电话15711005401</span>
+    </div>
     <div class="shell">
       <aside class="sidebar">
         <div class="brand">
@@ -25,13 +29,13 @@
         <section class="import-panel">
           <div class="section-title">
             <h2>导入材料</h2>
-            <span class="badge">RAGFlow</span>
+            <span class="badge">RAG</span>
           </div>
           <div class="operation-group">
             <div class="operation-head">
               <div>
                 <h3>本地文件</h3>
-                <p>文件会先加入待上传列表，再统一提交到 RAGFlow。</p>
+                <p>文件会先加入待上传列表，再统一提交到 RAG 知识库。</p>
               </div>
             </div>
             <label class="drop-zone" for="fileInput" id="dropZone">
@@ -75,7 +79,7 @@
             <h2>资料源</h2>
             <button class="text-button" id="refreshSourcesButton" type="button">刷新</button>
           </div>
-          <p class="section-help">这里是当前 RAGFlow 知识库资料，不是历史记录；状态为“可检索”的资料会参与本次 RAG 问答。</p>
+          <p class="section-help">这里是当前 RAG 知识库资料，不是历史记录；状态为“可检索”的资料会参与本次问答。</p>
           <div id="sourceList" class="source-list"></div>
         </section>
       </aside>
@@ -83,8 +87,8 @@
       <main class="main">
         <header class="topbar">
           <div>
-            <h2>RAG 搜索问答 vs 直接大模型问答</h2>
-            <p>同一个问题会同时走 RAGFlow 知识库和直接模型，便于对比差异。</p>
+            <h2>RAG 问答 vs LLM大模型问答</h2>
+            <p>同一个问题会同时走 RAG 知识库和 LLM 大模型，便于对比差异。</p>
           </div>
           <div class="button-row">
             <a class="secondary-button link-button" href="./login.html">连接后端</a>
@@ -100,7 +104,7 @@
             </div>
             <div class="options-panel">
               <div class="model-head">
-                <label class="field-label" for="modelSelect">直接大模型</label>
+                <label class="field-label" for="modelSelect">LLM大模型</label>
                 <button class="text-button compact-link" id="toggleDirectConfigButton" type="button">配置 API Key / 模型</button>
               </div>
               <select id="modelSelect"></select>
@@ -157,7 +161,7 @@
         <section class="compare-grid">
           <article class="answer-card">
             <div class="section-title">
-              <h2>RAGFlow RAG 问答</h2>
+              <h2>RAG 问答</h2>
               <span id="ragMeta" class="badge">未运行</span>
             </div>
             <pre id="ragAnswer" class="answer-box">等待提问。</pre>
@@ -169,7 +173,7 @@
 
           <article class="answer-card">
             <div class="section-title">
-              <h2>直接大模型问答</h2>
+              <h2>LLM大模型问答</h2>
               <span id="directMeta" class="badge muted-badge">未运行</span>
             </div>
             <pre id="directAnswer" class="answer-box">等待提问。</pre>

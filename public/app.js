@@ -150,6 +150,20 @@ function sourceKindLabel(kind) {
   return kind === "url" ? "网页" : "文件";
 }
 
+function simplifySourceMessage(message) {
+  const text = displayText(message).replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (/reader fallback fetched readable text/i.test(text)) return "已通过网页正文导入，正在解析。";
+  if (/Parse requested|still processing/i.test(text)) return "已提交解析，处理中。";
+  if (/ready for retrieval|Parsed by/i.test(text)) return "已解析，可用于 RAG。";
+  if (/Generate embedding error|RemoteDisconnected|Connection aborted|timeout/i.test(text)) {
+    return "解析失败：模型或网络连接异常，请稍后重试。";
+  }
+  if (/invalid api key/i.test(text)) return "API Key 无效，请重新配置。";
+  if (/403|access token|forbidden/i.test(text)) return "网页读取受限，已尽量使用可读取内容。";
+  return text.length > 96 ? `${text.slice(0, 96)}...` : text;
+}
+
 function renderSources() {
   const readyCount = state.sources.filter((source) => source.status === "ready").length;
   els.statusText.textContent = `${readyCount}/${state.sources.length} 个可检索`;
@@ -160,7 +174,8 @@ function renderSources() {
 
   els.sourceList.innerHTML = state.sources.map((source) => {
     const title = displayText(source.title || source.url || source.file_name || "未命名资料");
-    const message = displayText(source.status_message || "");
+    const rawMessage = displayText(source.status_message || "");
+    const message = simplifySourceMessage(rawMessage);
     return `
       <article class="source-item">
         <div class="source-main">
@@ -178,7 +193,7 @@ function renderSources() {
             <i data-lucide="trash-2"></i>
           </button>
         </div>
-        ${message ? `<small>${escapeHtml(message)}</small>` : ""}
+        ${message ? `<small title="${escapeHtml(rawMessage)}">${escapeHtml(message)}</small>` : ""}
       </article>
     `;
   }).join("");
@@ -206,8 +221,8 @@ function renderSettings() {
   els.directConfigPanel.hidden = false;
   els.toggleDirectConfigButton.textContent = "收起配置";
   els.modelHint.innerHTML = configured
-    ? `直接模型已配置：${escapeHtml(state.settings.directModel)}。下方可以随时更换 Base URL、API Key 或模型名。`
-    : `未配置直接大模型。RAGFlow 左栏仍可用；右栏需要先在这里填 API Key、Base URL 和模型名。`;
+    ? `LLM大模型已配置：${escapeHtml(state.settings.directModel)}。下方可以随时更换 Base URL、API Key 或模型名。`
+    : `未配置 LLM大模型。RAG 左栏仍可用；右栏需要先在这里填 API Key、Base URL 和模型名。`;
 }
 
 async function loadSettings() {
@@ -275,7 +290,7 @@ async function uploadFiles() {
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
   setBusy("upload", true);
-  els.importNotice.textContent = `正在上传 ${files.length} 个文件到 RAGFlow，并触发解析...`;
+  els.importNotice.textContent = `正在上传 ${files.length} 个文件到 RAG 知识库，并触发解析...`;
   try {
     const payload = await requestJson("/api/sources/upload", {
       method: "POST",
@@ -299,7 +314,7 @@ async function addUrls() {
   }
 
   setBusy("url", true);
-  els.urlNotice.textContent = "正在导入 URL：先尝试 RAGFlow 网页抓取，失败时会自动改用后端抓取正文。";
+  els.urlNotice.textContent = "正在导入 URL：先尝试 RAG 网页抓取，失败时会自动改用后端抓取正文。";
   try {
     const payload = await requestJson("/api/sources/url", {
       method: "POST",
@@ -342,7 +357,7 @@ function summarizeImport(items, label = "资料") {
   const lines = [`已提交 ${items.length} 个${label}：${ready} 个可检索，${parsing} 个解析中，${failed} 个失败。`];
   lines.push(...items.map((item, index) => {
     const name = displayText(item.title || item.url || item.file_name || item.fileName || "未命名资料");
-    const message = displayText(item.status_message || "");
+    const message = simplifySourceMessage(item.status_message || "");
     return `${index + 1}. ${name}：${statusLabel(item.status)}${message ? `，${message}` : ""}`;
   }));
   return lines.join("\n");
@@ -392,7 +407,7 @@ async function saveDirectConfig() {
   if (directApiKey) payload.directApiKey = directApiKey;
 
   setBusy("settings", true);
-  els.directConfigNotice.textContent = "正在保存直接大模型配置...";
+  els.directConfigNotice.textContent = "正在保存 LLM大模型配置...";
   try {
     state.settings = await requestJson("/api/settings", {
       method: "POST",
@@ -403,7 +418,7 @@ async function saveDirectConfig() {
     els.modelSelect.value = directModel;
     els.directConfigPanel.hidden = false;
     els.toggleDirectConfigButton.textContent = "收起配置";
-    els.directConfigNotice.textContent = "已保存直接大模型配置。现在可以运行右侧直接模型对比。";
+    els.directConfigNotice.textContent = "已保存 LLM大模型配置。现在可以运行右侧对比。";
     return true;
   } catch (error) {
     els.directConfigNotice.textContent = `保存失败：${error.message}`;
@@ -419,7 +434,7 @@ async function testDirectConfig() {
   if (!state.settings?.secrets?.directApiKey || !state.settings?.directModel) return;
 
   setBusy("settings", true);
-  els.directConfigNotice.textContent = "正在测试直接模型配置...";
+  els.directConfigNotice.textContent = "正在测试 LLM大模型配置...";
   try {
     const payload = await requestJson("/api/settings/test-direct", {
       method: "POST",
@@ -492,14 +507,14 @@ async function askCompare() {
       })
     });
 
-    els.ragMeta.textContent = `${payload.rag.model || "RAGFlow"} · ${payload.timings.ragMs}ms`;
-    els.directMeta.textContent = `${payload.direct.model || "Direct"} · ${payload.timings.directMs}ms`;
+    els.ragMeta.textContent = `${payload.rag.model || "RAG"} · ${payload.timings.ragMs}ms`;
+    els.directMeta.textContent = `${payload.direct.model || "LLM"} · ${payload.timings.directMs}ms`;
     els.ragAnswer.textContent = payload.rag.error
-      ? `RAGFlow 错误：${payload.rag.error}`
-      : payload.rag.answer || "RAGFlow 没有返回答案。";
+      ? `RAG 错误：${payload.rag.error}`
+      : payload.rag.answer || "RAG 没有返回答案。";
     els.directAnswer.textContent = payload.direct.error
-      ? `直接模型错误：${payload.direct.error}`
-      : payload.direct.answer || "直接模型没有返回答案。";
+      ? `LLM大模型错误：${payload.direct.error}`
+      : payload.direct.answer || "LLM大模型没有返回答案。";
     renderReferences(payload.rag.references || []);
     els.notice.textContent = [
       payload.warnings?.length ? `刷新警告：${payload.warnings.length} 条` : "",

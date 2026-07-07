@@ -173,17 +173,17 @@ async function loadQa() {
       </div>
       <div class="meta-row">
         <span>RAG: ${escapeHtml(row.rag_model || "-")}</span>
-        <span>Direct: ${escapeHtml(row.direct_model || "-")}</span>
+        <span>LLM: ${escapeHtml(row.direct_model || "-")}</span>
         ${row.errors?.length ? `<span class="status-error">${row.errors.length} 个错误</span>` : ""}
         ${row.warnings?.length ? `<span class="status-warn">${row.warnings.length} 个警告</span>` : ""}
       </div>
       <div class="history-columns">
         <div>
-          <h3>RAGFlow</h3>
+          <h3>RAG</h3>
           <div class="history-answer">${escapeHtml(row.rag_answer || "无答案")}</div>
         </div>
         <div>
-          <h3>直接模型</h3>
+          <h3>LLM大模型</h3>
           <div class="history-answer">${escapeHtml(row.direct_answer || "无答案")}</div>
         </div>
       </div>
