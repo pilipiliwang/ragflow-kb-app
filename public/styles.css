@@ -151,6 +151,28 @@ svg {
   gap: 12px;
 }
 
+.operation-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.operation-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.operation-head p {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .section-help,
 .model-hint {
   color: var(--muted);
@@ -265,6 +287,12 @@ svg {
   justify-content: flex-end;
 }
 
+.action-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 .text-input,
 textarea,
 select {
@@ -301,7 +329,7 @@ select:focus {
   place-items: center;
   gap: 6px;
   text-align: center;
-  background: var(--surface-muted);
+  background: #fff;
   cursor: pointer;
 }
 
@@ -481,7 +509,7 @@ select:focus {
   margin-top: 0;
   border: 1px dashed var(--line);
   border-radius: 8px;
-  background: var(--surface-muted);
+  background: #fff;
   padding: 8px 10px;
 }
 
@@ -685,9 +713,14 @@ select:focus {
   .topbar,
   .brand,
   .section-title,
-  .button-row {
+  .button-row,
+  .operation-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .action-bar {
+    grid-template-columns: 1fr;
   }
 
   .primary-button,

@@ -27,31 +27,47 @@
             <h2>导入材料</h2>
             <span class="badge">RAGFlow</span>
           </div>
-          <label class="drop-zone" for="fileInput" id="dropZone">
-            <i data-lucide="file-up"></i>
-            <span>选择或拖入文件</span>
-            <small>可多选，也可以分多次选择；文件会先加入待上传列表</small>
-          </label>
-          <input id="fileInput" class="native-file-input" type="file" multiple />
-          <div id="filePreview" class="file-preview empty compact-empty">尚未选择文件。</div>
-          <div class="button-row tight-row">
-            <button class="secondary-button compact" id="clearFilesButton" type="button">
-              <i data-lucide="x"></i>
-              清空待上传
-            </button>
+          <div class="operation-group">
+            <div class="operation-head">
+              <div>
+                <h3>本地文件</h3>
+                <p>文件会先加入待上传列表，再统一提交到 RAGFlow。</p>
+              </div>
+            </div>
+            <label class="drop-zone" for="fileInput" id="dropZone">
+              <i data-lucide="file-up"></i>
+              <span>选择或拖入文件</span>
+              <small>可多选，也可以分多次选择；文件会先加入待上传列表</small>
+            </label>
+            <input id="fileInput" class="native-file-input" type="file" multiple />
+            <div id="filePreview" class="file-preview empty compact-empty">尚未选择文件。</div>
+            <div class="action-bar">
+              <button class="primary-button" id="uploadButton" type="button">
+                <i data-lucide="upload-cloud"></i>
+                上传待选文件
+              </button>
+              <button class="secondary-button" id="clearFilesButton" type="button">
+                <i data-lucide="x"></i>
+                清空
+              </button>
+            </div>
+            <div id="importNotice" class="notice inline-notice"></div>
           </div>
-          <button class="primary-button" id="uploadButton" type="button">
-            <i data-lucide="upload-cloud"></i>
-            上传文件
-          </button>
-          <div id="importNotice" class="notice inline-notice"></div>
 
-          <label class="field-label" for="urlInput">网页 URL</label>
-          <textarea id="urlInput" rows="4" placeholder="每行一个网址；未粘贴时不会导入网页。"></textarea>
-          <button class="secondary-button" id="urlButton" type="button">
-            <i data-lucide="refresh-cw"></i>
-            粘贴并刷新 URL
-          </button>
+          <div class="operation-group">
+            <div class="operation-head">
+              <div>
+                <h3>网页 URL</h3>
+                <p>每行一个网址；不粘贴时不会导入网页。</p>
+              </div>
+            </div>
+            <textarea id="urlInput" rows="4" placeholder="https://example.com/page"></textarea>
+            <button class="primary-button" id="urlButton" type="button">
+              <i data-lucide="globe-2"></i>
+              导入/刷新 URL
+            </button>
+            <div id="urlNotice" class="notice inline-notice"></div>
+          </div>
         </section>
 
         <section class="source-list-wrap">
@@ -94,6 +110,7 @@
                   <span>常用模型</span>
                   <select id="directPresetSelect">
                     <option value="">手动填写</option>
+                    <option value="MiniMax-M3" data-base-url="https://api.minimax.io/v1">MiniMax M3</option>
                     <option value="deepseek-chat" data-base-url="https://api.deepseek.com/v1">DeepSeek Chat</option>
                     <option value="qwen-plus" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">通义千问 qwen-plus</option>
                     <option value="gpt-4o-mini" data-base-url="https://api.openai.com/v1">OpenAI gpt-4o-mini</option>

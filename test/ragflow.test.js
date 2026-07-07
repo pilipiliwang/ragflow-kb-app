@@ -18,7 +18,7 @@ test("RagflowClient wraps upload, parse, and chat requests", async () => {
     calls.push({ url, method: options.method || "GET", body: options.body });
     if (url.endsWith("/documents?type=web")) return jsonResponse([{ id: "doc-web" }]);
     if (url.endsWith("/documents")) return jsonResponse([{ id: "doc-file" }]);
-    if (url.endsWith("/chunks")) return jsonResponse({ ok: true });
+    if (url.endsWith("/documents/parse")) return jsonResponse({ ok: true });
     if (url.endsWith("/chat/completions")) {
       return jsonResponse({
         answer: "RAG answer",
@@ -35,7 +35,7 @@ test("RagflowClient wraps upload, parse, and chat requests", async () => {
     mimetype: "text/plain",
     originalname: "hello.txt"
   });
-  const webDoc = await client.uploadUrl("ds1", "https://example.com");
+  const webDoc = await client.uploadUrl("ds1", "https://example.com", { name: "example" });
   await client.parseDocuments("ds1", [fileDoc.id, webDoc.id]);
   const answer = await client.chat({ chatId: "chat1", question: "hello" });
 
@@ -43,7 +43,28 @@ test("RagflowClient wraps upload, parse, and chat requests", async () => {
   assert.equal(webDoc.id, "doc-web");
   assert.equal(answer.answer, "RAG answer");
   assert.equal(answer.references[0].documentId, "doc-web");
-  assert.equal(calls.some((call) => call.url.includes("/chunks") && call.method === "POST"), true);
+  assert.equal(calls.some((call) => call.url.includes("/documents/parse") && call.method === "POST"), true);
+  const webUpload = calls.find((call) => call.url.endsWith("/documents?type=web"));
+  assert.equal(webUpload.body.get("name"), "example");
+});
+
+test("RagflowClient falls back to legacy parse endpoint when needed", async () => {
+  const calls = [];
+  const client = new RagflowClient({
+    ragflowBaseUrl: "http://ragflow.local",
+    ragflowApiKey: "key"
+  }, async (url, options = {}) => {
+    calls.push({ url, method: options.method || "GET" });
+    if (url.endsWith("/documents/parse")) {
+      return new Response("missing", { status: 404 });
+    }
+    if (url.endsWith("/chunks")) return jsonResponse({ ok: true });
+    return jsonResponse({});
+  });
+
+  await client.parseDocuments("ds1", ["doc1"]);
+  assert.equal(calls.some((call) => call.url.endsWith("/documents/parse")), true);
+  assert.equal(calls.some((call) => call.url.endsWith("/chunks")), true);
 });
 
 test("RagflowClient retries retryable JSON requests", async () => {

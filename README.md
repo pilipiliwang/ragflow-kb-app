@@ -54,6 +54,14 @@ DIRECT_AI_MODEL=模型名
 
 `APP_SECRET` 用来加密 SQLite 里的 API key。生产环境不要随意更换，否则旧 key 无法解密。
 
+URL 导入会先调用 RAGFlow 的 `type=web`；如果失败，会由 App 后端抓取网页正文后作为文本文件上传到 RAGFlow。若目标网站阻止服务端抓取，默认会再尝试 reader fallback。需要关闭这个第三方 reader fallback 时设置：
+
+```text
+URL_READER_FALLBACK=false
+```
+
+Windows 本地开发时，如果 Node 网络栈访问 reader 超时，但系统网络能访问，App 还会尝试 PowerShell 系统抓取作为最后兜底。Docker/Linux 云端不会依赖这个能力；需要关闭时设置 `URL_READER_SYSTEM_FETCH=false`。
+
 如果 GitHub Pages 前端连接云服务器后端，后端必须使用 HTTPS，并设置：
 
 ```text
@@ -164,4 +172,5 @@ npm test
 - API key 加密、脱敏、持久化。
 - jobs 表和后台任务执行器。
 - RAGFlow adapter 的上传、URL、parse、chat、重试和解析轮询。
+- URL 导入的后端正文抓取和 reader fallback。
 - mock RAGFlow + mock 模型的对比问答和历史记录。

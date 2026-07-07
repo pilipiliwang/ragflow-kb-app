@@ -2,7 +2,13 @@ const state = {
   settings: null,
   sources: [],
   selectedFiles: [],
-  busy: false
+  busy: {
+    upload: false,
+    url: false,
+    source: false,
+    settings: false,
+    ask: false
+  }
 };
 
 const els = {
@@ -15,6 +21,7 @@ const els = {
   importNotice: document.querySelector("#importNotice"),
   urlInput: document.querySelector("#urlInput"),
   urlButton: document.querySelector("#urlButton"),
+  urlNotice: document.querySelector("#urlNotice"),
   refreshSourcesButton: document.querySelector("#refreshSourcesButton"),
   sourceList: document.querySelector("#sourceList"),
   logoutButton: document.querySelector("#logoutButton"),
@@ -43,19 +50,19 @@ function createIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-function setBusy(value) {
-  state.busy = value;
-  [
-    els.uploadButton,
-    els.urlButton,
-    els.refreshSourcesButton,
-    els.askButton,
-    els.logoutButton,
-    els.clearFilesButton,
-    els.saveDirectConfigButton
-  ].forEach((button) => {
-    if (button) button.disabled = value;
-  });
+function setBusy(scope, value) {
+  state.busy[scope] = value;
+  const groups = {
+    upload: [els.uploadButton, els.clearFilesButton, els.fileInput],
+    url: [els.urlButton, els.urlInput],
+    source: [els.refreshSourcesButton],
+    settings: [els.saveDirectConfigButton, els.directPresetSelect, els.directBaseUrlInput, els.directApiKeyInput, els.directModelInput],
+    ask: [els.askButton]
+  };
+
+  for (const control of groups[scope] || []) {
+    if (control) control.disabled = value;
+  }
 }
 
 async function requestJson(url, options = {}) {
@@ -266,7 +273,7 @@ async function uploadFiles() {
 
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
-  setBusy(true);
+  setBusy("upload", true);
   els.importNotice.textContent = `正在上传 ${files.length} 个文件到 RAGFlow，并触发解析...`;
   try {
     const payload = await requestJson("/api/sources/upload", {
@@ -279,38 +286,38 @@ async function uploadFiles() {
   } catch (error) {
     els.importNotice.textContent = `上传失败：${error.message}`;
   } finally {
-    setBusy(false);
+    setBusy("upload", false);
   }
 }
 
 async function addUrls() {
   const urls = els.urlInput.value.trim();
   if (!urls) {
-    els.notice.textContent = "没有粘贴 URL，不会导入网页。";
+    els.urlNotice.textContent = "没有粘贴 URL，不会导入网页。";
     return;
   }
 
-  setBusy(true);
-  els.notice.textContent = "正在刷新 URL 并触发 RAGFlow 解析...";
+  setBusy("url", true);
+  els.urlNotice.textContent = "正在导入 URL：先尝试 RAGFlow 网页抓取，失败时会自动改用后端抓取正文。";
   try {
     const payload = await requestJson("/api/sources/url", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ urls })
     });
-    els.notice.textContent = summarizeImport(payload.imported || [], "URL");
+    els.urlNotice.textContent = summarizeImport(payload.imported || [], "URL");
     els.urlInput.value = "";
     await loadSources();
   } catch (error) {
-    els.notice.textContent = `URL 导入失败：${error.message}`;
+    els.urlNotice.textContent = `URL 导入失败：${error.message}`;
   } finally {
-    setBusy(false);
+    setBusy("url", false);
   }
 }
 
 async function deleteSource(sourceId) {
   if (!sourceId) return;
-  setBusy(true);
+  setBusy("source", true);
   els.notice.textContent = "正在删除资料源...";
   try {
     const payload = await requestJson(`/api/admin/sources/${encodeURIComponent(sourceId)}`, {
@@ -322,7 +329,7 @@ async function deleteSource(sourceId) {
   } catch (error) {
     els.notice.textContent = `删除失败：${error.message}`;
   } finally {
-    setBusy(false);
+    setBusy("source", false);
   }
 }
 
@@ -383,7 +390,7 @@ async function saveDirectConfig() {
   };
   if (directApiKey) payload.directApiKey = directApiKey;
 
-  setBusy(true);
+  setBusy("settings", true);
   els.directConfigNotice.textContent = "正在保存直接大模型配置...";
   try {
     state.settings = await requestJson("/api/settings", {
@@ -399,7 +406,7 @@ async function saveDirectConfig() {
   } catch (error) {
     els.directConfigNotice.textContent = `保存失败：${error.message}`;
   } finally {
-    setBusy(false);
+    setBusy("settings", false);
   }
 }
 
@@ -442,7 +449,7 @@ async function askCompare() {
     return;
   }
 
-  setBusy(true);
+  setBusy("ask", true);
   els.notice.textContent = els.refreshUrlsToggle.checked
     ? "正在刷新 URL 源并对比问答..."
     : "正在对比问答...";
@@ -478,7 +485,7 @@ async function askCompare() {
   } catch (error) {
     els.notice.textContent = `问答失败：${error.message}`;
   } finally {
-    setBusy(false);
+    setBusy("ask", false);
   }
 }
 

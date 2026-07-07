@@ -1,5 +1,9 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { hashValue } from "./crypto.js";
 import { ensureRagflowResources, normalizeRunState } from "./ragflow.js";
+
+const execFileAsync = promisify(execFile);
 
 function documentIdFrom(uploadResult) {
   return uploadResult?.id || uploadResult?.document_id || uploadResult?.doc_id || "";
@@ -11,20 +15,250 @@ function titleFromFile(file) {
 
 function titleFromUrl(url) {
   try {
-    return new URL(url).hostname + new URL(url).pathname;
+    const parsed = new URL(url);
+    return `${parsed.hostname}${parsed.pathname === "/" ? "" : parsed.pathname}`;
   } catch {
     return url;
   }
 }
 
-async function waitForParse(source, db, client, datasetId, documentId) {
+function documentNameFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, "") || "/home";
+    const raw = `${parsed.hostname}${path}`;
+    const slug = raw
+      .replace(/^www\./i, "")
+      .replace(/[^a-z0-9._-]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 120);
+    return slug || "web-page";
+  } catch {
+    return "web-page";
+  }
+}
+
+function decodeHtmlEntities(text) {
+  return String(text || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#(\d+);/g, (_match, code) => {
+      const value = Number(code);
+      return Number.isFinite(value) && value >= 0 && value <= 0x10ffff ? String.fromCodePoint(value) : "";
+    });
+}
+
+function extractTitle(html, fallback) {
+  const match = String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return decodeHtmlEntities(match?.[1] || "").replace(/\s+/g, " ").trim() || fallback;
+}
+
+function htmlToText(html) {
+  return decodeHtmlEntities(String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<\/(p|div|section|article|header|footer|main|aside|li|h[1-6]|tr|table|br)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+  )
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function errorMessage(error) {
+  const code = error?.cause?.code || error?.code || "";
+  return code ? `${error.message} (${code})` : error.message;
+}
+
+function commandErrorMessage(error) {
+  const text = String(error?.stderr || error?.message || "command failed").trim();
+  return text.split(/\r?\n/).find(Boolean)?.slice(0, 400) || "command failed";
+}
+
+async function fetchDirectUrlAsText(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.URL_FETCH_TIMEOUT_MS || 20000));
+  try {
+    const response = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "user-agent": "RAGFlow-KB-App/0.1 (+https://github.com/pilipiliwang/ragflow-kb-app)",
+        accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2"
+      }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const contentType = response.headers.get("content-type") || "";
+    const body = await response.text();
+    const fallbackTitle = titleFromUrl(url);
+    const title = contentType.includes("html") ? extractTitle(body, fallbackTitle) : fallbackTitle;
+    const text = contentType.includes("html") ? htmlToText(body) : body.trim();
+    if (!text) throw new Error("Fetched page has no readable text.");
+    return {
+      title,
+      contentType,
+      text: text.slice(0, Number(process.env.URL_FETCH_TEXT_LIMIT || 300000)),
+      mode: "direct-fetch"
+    };
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("URL fetch timed out.");
+    throw new Error(errorMessage(error));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchReaderUrlAsText(url, directError) {
+  if (process.env.URL_READER_FALLBACK === "false") throw directError;
+  const readerBaseUrl = process.env.URL_READER_BASE_URL || "https://r.jina.ai/http://r.jina.ai/http://";
+  const readerUrl = `${readerBaseUrl}${url}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.URL_READER_TIMEOUT_MS || 30000));
+  try {
+    const response = await fetch(readerUrl, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "user-agent": "RAGFlow-KB-App/0.1 (+https://github.com/pilipiliwang/ragflow-kb-app)",
+        accept: "text/plain, text/markdown, */*;q=0.2"
+      }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = (await response.text()).trim();
+    if (!text) throw new Error("Reader returned no readable text.");
+    return readerTextResult(url, text, response.headers.get("content-type") || "text/markdown", "reader-fetch");
+  } catch (error) {
+    const readerError = error.name === "AbortError"
+      ? new Error("reader fallback timed out.")
+      : new Error(`reader fallback failed: ${errorMessage(error)}`);
+    return fetchReaderUrlViaSystem(url, readerUrl, directError, readerError);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function readerTextResult(url, text, contentType, mode) {
+  return {
+    title: text.match(/^Title:\s*(.+)$/m)?.[1]?.trim() || titleFromUrl(url),
+    contentType,
+    text: text.slice(0, Number(process.env.URL_FETCH_TEXT_LIMIT || 300000)),
+    mode
+  };
+}
+
+async function fetchReaderUrlViaSystem(url, readerUrl, directError, readerError) {
+  if (process.platform !== "win32" || process.env.URL_READER_SYSTEM_FETCH === "false") {
+    throw new Error(`${directError.message}; ${readerError.message}`);
+  }
+  const timeoutSec = Math.ceil(Number(process.env.URL_READER_TIMEOUT_MS || 30000) / 1000);
+  const script = [
+    "& { param($ReaderUrl, $TimeoutSec)",
+    "$ProgressPreference = 'SilentlyContinue'",
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+    "$response = Invoke-WebRequest -UseBasicParsing -Uri $ReaderUrl -TimeoutSec ([int]$TimeoutSec)",
+    "if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) { throw \"HTTP $($response.StatusCode)\" }",
+    "Write-Output $response.Content",
+    "}"
+  ].join("; ");
+
+  try {
+    const { stdout } = await execFileAsync("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      script,
+      readerUrl,
+      String(timeoutSec)
+    ], {
+      timeout: Number(process.env.URL_READER_TIMEOUT_MS || 30000) + 5000,
+      maxBuffer: Number(process.env.URL_READER_MAX_BUFFER || 5 * 1024 * 1024)
+    });
+    const text = stdout.trim();
+    if (!text) throw new Error("system reader fetch returned no readable text.");
+    return readerTextResult(url, text, "text/markdown", "system-reader-fetch");
+  } catch (systemError) {
+    throw new Error(`${directError.message}; ${readerError.message}; system reader fallback failed: ${commandErrorMessage(systemError)}`);
+  }
+}
+
+async function fetchUrlAsText(url) {
+  try {
+    return await fetchDirectUrlAsText(url);
+  } catch (directError) {
+    return fetchReaderUrlAsText(url, directError);
+  }
+}
+
+async function uploadFetchedUrlAsFile(client, datasetId, normalizedUrl, webError) {
+  const fetched = await fetchUrlAsText(normalizedUrl);
+  const name = documentNameFromUrl(normalizedUrl);
+  const body = [
+    `Title: ${fetched.title}`,
+    `URL: ${normalizedUrl}`,
+    `Fetched-At: ${new Date().toISOString()}`,
+    `Content-Type: ${fetched.contentType || "unknown"}`,
+    "",
+    fetched.text
+  ].join("\n");
+  const buffer = Buffer.from(body, "utf8");
+  const uploaded = await client.uploadFile(datasetId, {
+    buffer,
+    originalname: `${name}.txt`,
+    mimetype: "text/plain",
+    size: buffer.byteLength
+  });
+  return {
+    uploaded,
+    mode: fetched.mode,
+    title: fetched.title,
+    size: buffer.byteLength,
+    statusMessage: fetched.mode === "reader-fetch" || fetched.mode === "system-reader-fetch"
+      ? `RAGFlow web crawler failed (${webError.message}); direct backend fetch was blocked, reader fallback fetched readable text and uploaded it as a text document.`
+      : `RAGFlow web crawler failed (${webError.message}); backend fetched readable text and uploaded it as a text document.`
+  };
+}
+
+async function uploadUrlDocument(client, datasetId, normalizedUrl) {
+  const name = documentNameFromUrl(normalizedUrl);
+  try {
+    const uploaded = await client.uploadUrl(datasetId, normalizedUrl, { name });
+    return {
+      uploaded,
+      mode: "ragflow-web",
+      title: uploaded?.name || uploaded?.title || titleFromUrl(normalizedUrl),
+      size: uploaded?.size || 0,
+      statusMessage: "URL imported by RAGFlow web crawler and parse requested."
+    };
+  } catch (webError) {
+    try {
+      return await uploadFetchedUrlAsFile(client, datasetId, normalizedUrl, webError);
+    } catch (fallbackError) {
+      throw new Error(`RAGFlow web crawler failed: ${webError.message}; backend URL fetch fallback failed: ${fallbackError.message}`);
+    }
+  }
+}
+
+async function waitForParse(source, db, client, datasetId, documentId, contextMessage = "") {
   const parsed = await client.waitForDocumentParsed(datasetId, documentId);
   const ready = parsed.status === "ready";
   return db.updateSourceStatus(source.id, {
     status: ready ? "ready" : "parsing",
-    statusMessage: ready
-      ? "Parsed by RAGFlow and ready for retrieval."
-      : "Parse requested; RAGFlow is still processing the document.",
+    statusMessage: [
+      contextMessage,
+      ready
+        ? "Parsed by RAGFlow and ready for retrieval."
+        : "Parse requested; RAGFlow is still processing the document."
+    ].filter(Boolean).join(" "),
     refreshedAt: new Date().toISOString()
   });
 }
@@ -121,23 +355,31 @@ export async function refreshUrlSource(db, url) {
   }
 
   try {
-    const uploaded = await resources.client.uploadUrl(resources.datasetId, normalizedUrl);
+    const uploadResult = await uploadUrlDocument(resources.client, resources.datasetId, normalizedUrl);
+    const uploaded = uploadResult.uploaded;
     const documentId = documentIdFrom(uploaded);
+    if (!documentId) throw new Error("RAGFlow URL import did not return a document id.");
     source = db.updateSourceStatus(source.id, {
-      title: uploaded?.name || uploaded?.title || titleFromUrl(normalizedUrl),
+      title: uploadResult.title || uploaded?.name || uploaded?.title || titleFromUrl(normalizedUrl),
       ragflowDatasetId: resources.datasetId,
       ragflowDocumentId: documentId,
       status: "parsing",
       statusMessage: [
         deleteWarning,
-        "URL imported to RAGFlow and parse requested."
+        uploadResult.statusMessage
       ].filter(Boolean).join(" "),
+      size: uploadResult.size || uploaded?.size || source.size,
       contentHash: hashValue(`${normalizedUrl}:${Date.now()}`),
       refreshedAt: new Date().toISOString()
     });
     await db.save();
     await resources.client.parseDocuments(resources.datasetId, [documentId]);
-    source = await waitForParse(source, db, resources.client, resources.datasetId, documentId);
+    const contextMessage = uploadResult.mode === "direct-fetch"
+      ? "RAGFlow web crawler failed; backend fetched readable text instead."
+      : uploadResult.mode === "reader-fetch" || uploadResult.mode === "system-reader-fetch"
+        ? "RAGFlow web crawler failed; reader fallback fetched readable text instead."
+        : "";
+    source = await waitForParse(source, db, resources.client, resources.datasetId, documentId, contextMessage);
     await db.save();
     return source;
   } catch (error) {

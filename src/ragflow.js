@@ -49,6 +49,10 @@ function isNoParsedFileError(error) {
   return String(error?.message || "").includes("doesn't own parsed file");
 }
 
+function isMissingEndpointError(error) {
+  return /HTTP (404|405)|not found|method not allowed/i.test(String(error?.message || ""));
+}
+
 function chatDatasetIds(chat) {
   if (Array.isArray(chat?.dataset_ids)) return chat.dataset_ids;
   if (Array.isArray(chat?.kb_ids)) return chat.kb_ids;
@@ -246,9 +250,9 @@ export class RagflowClient {
     return Array.isArray(data) ? data[0] : data?.[0] || data;
   }
 
-  async uploadUrl(datasetId, url) {
+  async uploadUrl(datasetId, url, options = {}) {
     const form = new FormData();
-    form.append("name", url);
+    form.append("name", options.name || url);
     form.append("url", url);
     const data = await this.request(`/api/v1/datasets/${datasetId}/documents?type=web`, {
       method: "POST",
@@ -268,10 +272,18 @@ export class RagflowClient {
   async parseDocuments(datasetId, documentIds) {
     const ids = documentIds.filter(Boolean);
     if (!ids.length) return null;
-    return this.request(`/api/v1/datasets/${datasetId}/chunks`, {
-      method: "POST",
-      body: { document_ids: ids }
-    });
+    try {
+      return await this.request(`/api/v1/datasets/${datasetId}/documents/parse`, {
+        method: "POST",
+        body: { document_ids: ids }
+      });
+    } catch (error) {
+      if (!isMissingEndpointError(error)) throw error;
+      return this.request(`/api/v1/datasets/${datasetId}/chunks`, {
+        method: "POST",
+        body: { document_ids: ids }
+      });
+    }
   }
 
   async listDocuments(datasetId, params = {}) {
