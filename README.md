@@ -27,10 +27,11 @@ npm start
 http://localhost:4317
 ```
 
-默认邀请码在 `.env.example` 中是：
+默认开发邀请码在 `.env.example` 中是：
 
 ```text
 dev-invite
+demo-2026
 ```
 
 ## 必要配置

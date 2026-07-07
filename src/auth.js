@@ -5,7 +5,7 @@ const COOKIE_NAME = "rag_kb_access";
 const MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 function inviteCodes() {
-  const raw = process.env.APP_INVITE_CODES || "dev-invite";
+  const raw = process.env.APP_INVITE_CODES || "dev-invite,demo-2026";
   return raw
     .split(",")
     .map((item) => item.trim())
