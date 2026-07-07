@@ -10,23 +10,46 @@
     <script src="./login.js" defer></script>
   </head>
   <body class="login-body">
-    <main class="login-card">
-      <div class="login-icon">
-        <i data-lucide="key-round"></i>
+    <main class="login-screen">
+      <div class="login-box">
+        <section class="login-hero">
+          <div class="login-brand">
+            <b>维睿塔 RAG</b>
+            <span>知识库问答系统</span>
+          </div>
+          <h1>连接业务资料，<br />让每一次回答都有依据。</h1>
+          <p>支持本地文档、网页 URL、RAG 检索问答和通用大模型问答对比。适用于项目资料、制度文件、采购需求、会议纪要和业务知识沉淀。</p>
+          <div class="flow-card">
+            <strong>工作流程</strong>
+            <div class="flow-grid">
+              <div>导入资料</div>
+              <div>解析入库</div>
+              <div>智能问答</div>
+              <div>引用溯源</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="login-card">
+          <div class="login-icon">
+            <i data-lucide="key-round"></i>
+          </div>
+          <h2>访问登录</h2>
+          <p>输入访问凭证后进入工作台，开始管理资料源并进行知识库问答。</p>
+          <label class="label" for="apiBaseInput">后端 API 地址</label>
+          <input id="apiBaseInput" class="text-input" placeholder="留空表示当前域名，例如 http://localhost:4317" />
+          <label class="label" for="apiKeyInput">访问 Key</label>
+          <input id="apiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="本机/云端 API 方式访问时填写" />
+          <label class="label" for="codeInput">邀请码</label>
+          <input id="codeInput" class="text-input" type="password" autocomplete="current-password" placeholder="使用 API Key 时可留空" />
+          <button id="loginButton" class="btn-primary full-width login-submit" type="button">
+            <i data-lucide="log-in"></i>
+            进入工作台
+          </button>
+          <div id="loginMessage" class="notice"></div>
+          <div class="footer-note">@copyright 上海维睿塔数字科技 RAG开发环境</div>
+        </section>
       </div>
-      <h1>访问知识库</h1>
-      <p>请输入邀请码。默认本地开发码见 `.env.example`。</p>
-      <label class="field-label" for="apiBaseInput">后端 API 地址</label>
-      <input id="apiBaseInput" class="text-input" placeholder="留空表示当前域名，例如 http://localhost:4317" />
-      <label class="field-label" for="apiKeyInput">外部 API Key</label>
-      <input id="apiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="本机/云端 API 方式访问时填写" />
-      <label class="field-label" for="codeInput">邀请码</label>
-      <input id="codeInput" class="text-input" type="password" autocomplete="current-password" placeholder="使用 API Key 时可留空" />
-      <button id="loginButton" class="primary-button" type="button">
-        <i data-lucide="log-in"></i>
-        进入
-      </button>
-      <div id="loginMessage" class="notice"></div>
     </main>
   </body>
 </html>

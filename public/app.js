@@ -44,7 +44,10 @@ const els = {
   ragAnswer: document.querySelector("#ragAnswer"),
   directMeta: document.querySelector("#directMeta"),
   directAnswer: document.querySelector("#directAnswer"),
-  references: document.querySelector("#references")
+  references: document.querySelector("#references"),
+  sourceCountMetric: document.querySelector("#sourceCountMetric"),
+  readyCountMetric: document.querySelector("#readyCountMetric"),
+  modelMetric: document.querySelector("#modelMetric")
 };
 
 function createIcons() {
@@ -150,6 +153,24 @@ function sourceKindLabel(kind) {
   return kind === "url" ? "网页" : "文件";
 }
 
+function sourceBadgeInfo(source, title) {
+  if (source.kind === "url") return { label: "URL", className: "url" };
+  const name = displayText(source.file_name || title || "").toLowerCase();
+  const ext = (name.match(/\.([a-z0-9]+)(?:$|\?)/)?.[1] || "file").slice(0, 4);
+  if (ext === "pdf") return { label: "PDF", className: "pdf" };
+  if (["xls", "xlsx", "csv"].includes(ext)) return { label: "XLS", className: "xls" };
+  if (["doc", "docx"].includes(ext)) return { label: "DOC", className: "" };
+  if (["md", "txt"].includes(ext)) return { label: ext.toUpperCase(), className: "" };
+  return { label: "FILE", className: "" };
+}
+
+function sourceStateClass(status) {
+  if (status === "ready") return "green";
+  if (status === "error") return "red";
+  if (status === "parsing" || status === "refreshing" || status === "uploading") return "orange";
+  return "gray";
+}
+
 function simplifySourceMessage(message) {
   const text = displayText(message).replace(/\s+/g, " ").trim();
   if (!text) return "";
@@ -167,6 +188,8 @@ function simplifySourceMessage(message) {
 function renderSources() {
   const readyCount = state.sources.filter((source) => source.status === "ready").length;
   els.statusText.textContent = `${readyCount}/${state.sources.length} 个可检索`;
+  if (els.sourceCountMetric) els.sourceCountMetric.textContent = String(state.sources.length);
+  if (els.readyCountMetric) els.readyCountMetric.textContent = String(readyCount);
   if (!state.sources.length) {
     els.sourceList.innerHTML = `<div class="empty">暂无资料源。上传文件或粘贴 URL 后，这里会显示当前知识库中可用于 RAG 的材料。</div>`;
     return;
@@ -176,23 +199,26 @@ function renderSources() {
     const title = displayText(source.title || source.url || source.file_name || "未命名资料");
     const rawMessage = displayText(source.status_message || "");
     const message = simplifySourceMessage(rawMessage);
+    const badge = sourceBadgeInfo(source, title);
+    const meta = [
+      sourceKindLabel(source.kind),
+      formatDate(source.refreshed_at || source.updated_at),
+      source.size ? formatBytes(source.size) : ""
+    ].filter(Boolean).map(escapeHtml).join(" · ");
     return `
       <article class="source-item" data-status="${escapeHtml(source.status || "")}">
-        <div class="source-main">
-          <div class="source-copy">
-            <div class="source-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
-            <div class="source-meta">
-              <span>${sourceKindLabel(source.kind)}</span>
-              <span class="source-status ${statusClass(source.status)}">${statusLabel(source.status)}</span>
-              <span>${formatDate(source.refreshed_at || source.updated_at)}</span>
-              ${source.size ? `<span>${formatBytes(source.size)}</span>` : ""}
-            </div>
-          </div>
+        <div class="type-badge ${escapeHtml(badge.className)}">${escapeHtml(badge.label)}</div>
+        <div class="source-copy">
+          <b class="source-title" title="${escapeHtml(title)}">${escapeHtml(title)}</b>
+          <span class="source-meta">${meta}</span>
+          ${message && source.status !== "ready" ? `<small class="source-message" title="${escapeHtml(rawMessage)}">${escapeHtml(message)}</small>` : ""}
+        </div>
+        <div class="source-actions">
+          <span class="state ${sourceStateClass(source.status)}">${statusLabel(source.status)}</span>
           <button class="icon-button source-delete" type="button" data-delete-source="${escapeHtml(source.id)}" title="删除资料源">
             <i data-lucide="trash-2"></i>
           </button>
         </div>
-        ${message && source.status !== "ready" ? `<small class="source-message" title="${escapeHtml(rawMessage)}">${escapeHtml(message)}</small>` : ""}
       </article>
     `;
   }).join("");
@@ -222,6 +248,7 @@ function renderSettings() {
   els.modelHint.innerHTML = configured
     ? `LLM大模型已配置：${escapeHtml(state.settings.directModel)}。下方可以随时更换 Base URL、API Key 或模型名。`
     : `未配置 LLM大模型。RAG 左栏仍可用；右栏需要先在这里填 API Key、Base URL 和模型名。`;
+  if (els.modelMetric) els.modelMetric.textContent = state.settings?.directModel || "未配置";
 }
 
 async function loadSettings() {
@@ -532,6 +559,23 @@ async function logout() {
   window.location.href = "./login.html";
 }
 
+function setupImportTabs() {
+  const tabs = [...document.querySelectorAll("[data-import-tab]")];
+  const sections = {
+    local: document.querySelector("#importLocal"),
+    url: document.querySelector("#importUrl")
+  };
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.importTab;
+      tabs.forEach((item) => item.classList.toggle("active", item === tab));
+      for (const [key, section] of Object.entries(sections)) {
+        if (section) section.classList.toggle("active", key === target);
+      }
+    });
+  }
+}
+
 els.uploadButton.addEventListener("click", uploadFiles);
 els.urlButton.addEventListener("click", addUrls);
 els.refreshSourcesButton.addEventListener("click", loadSources);
@@ -579,6 +623,7 @@ els.dropZone.addEventListener("drop", (event) => {
   addPendingFiles(event.dataTransfer.files);
 });
 
+setupImportTabs();
 createIcons();
 renderSelectedFiles();
 Promise.all([loadSettings(), loadSources()]).catch((error) => {

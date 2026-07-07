@@ -9,177 +9,215 @@
     <script src="./api.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
-  <body>
-    <div class="copyright-bar">
-      <span>@copyright 上海维睿塔数字科技 RAG开发环境</span>
-      <span>调用联系电话15711005401</span>
-    </div>
-    <div class="shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <div>
-            <h1>知识库问答</h1>
-            <p id="statusText">连接中...</p>
-          </div>
-          <a class="icon-button" href="./admin.html" title="后台">
-            <i data-lucide="settings"></i>
-          </a>
+  <body class="app-body">
+    <section class="workspace active">
+      <aside class="workspace-sidebar">
+        <div class="side-brand">
+          <b>维睿塔 RAG</b>
+          <span>知识库问答系统</span>
         </div>
 
-        <section class="import-panel">
-          <div class="section-title">
-            <h2>导入材料</h2>
-            <span class="badge">RAG</span>
-          </div>
-          <div class="operation-group">
-            <div class="operation-head">
-              <div>
-                <h3>本地文件</h3>
-                <p>文件会先加入待上传列表，再统一提交到 RAG 知识库。</p>
-              </div>
-            </div>
-            <label class="drop-zone" for="fileInput" id="dropZone">
-              <i data-lucide="file-up"></i>
-              <span>选择或拖入文件</span>
-              <small>可多选，也可以分多次选择；文件会先加入待上传列表</small>
-            </label>
-            <input id="fileInput" class="native-file-input" type="file" multiple />
-            <div id="filePreview" class="file-preview empty compact-empty">尚未选择文件。</div>
-            <div class="action-bar">
-              <button class="primary-button" id="uploadButton" type="button">
-                <i data-lucide="upload-cloud"></i>
-                上传待选文件
-              </button>
-              <button class="secondary-button" id="clearFilesButton" type="button">
-                <i data-lucide="x"></i>
-                清空
-              </button>
-            </div>
-            <div id="importNotice" class="notice inline-notice"></div>
-          </div>
+        <div>
+          <p class="nav-group-title">工作台</p>
+          <nav class="nav">
+            <a class="nav-button active" href="./index.html">知识库问答</a>
+            <a class="nav-button" href="./admin.html">知识库后台</a>
+            <a class="nav-button" href="#model-config">模型配置</a>
+          </nav>
+        </div>
 
-          <div class="operation-group">
-            <div class="operation-head">
-              <div>
-                <h3>网页 URL</h3>
-                <p>每行一个网址；不粘贴时不会导入网页。</p>
-              </div>
-            </div>
-            <textarea id="urlInput" rows="4" placeholder="https://example.com/page"></textarea>
-            <button class="primary-button" id="urlButton" type="button">
-              <i data-lucide="globe-2"></i>
-              导入/刷新 URL
-            </button>
-            <div id="urlNotice" class="notice inline-notice"></div>
-          </div>
-        </section>
-
-        <section class="source-list-wrap">
-          <div class="section-title">
-            <h2>资料源</h2>
-            <button class="text-button" id="refreshSourcesButton" type="button">刷新</button>
-          </div>
-          <p class="section-help">这里是当前 RAG 知识库资料，不是历史记录；状态为“可检索”的资料会参与本次问答。</p>
-          <div id="sourceList" class="source-list"></div>
-        </section>
+        <div class="side-note">
+          <strong>当前知识库</strong>
+          <p id="statusText">连接中...</p>
+          <p>状态为“可检索”的资料会参与本次 RAG 问答。建议问答前刷新网页 URL 源。</p>
+        </div>
       </aside>
 
-      <main class="main">
-        <header class="topbar">
-          <div>
-            <h2>RAG 问答 vs LLM大模型问答</h2>
-            <p>同一个问题会同时走 RAG 知识库和 LLM 大模型，便于对比差异。</p>
-          </div>
-          <div class="button-row">
-            <a class="secondary-button link-button" href="./login.html">连接后端</a>
-            <button class="text-button danger" id="logoutButton" type="button">退出</button>
-          </div>
-        </header>
-
-        <section class="question-panel">
-          <div class="question-grid">
+      <main class="content">
+        <section class="page active">
+          <div class="topbar">
             <div>
-              <label class="field-label" for="questionInput">问题</label>
-              <textarea id="questionInput" rows="4" placeholder="例如：家族信托怎么降低受益人挥霍风险？"></textarea>
+              <div class="crumb">工作台 / 知识库问答</div>
+              <h1>知识库问答</h1>
             </div>
-            <div class="options-panel">
-              <div class="model-head">
-                <label class="field-label" for="modelSelect">LLM大模型</label>
-                <button class="text-button compact-link" id="toggleDirectConfigButton" type="button">配置 API Key / 模型</button>
-              </div>
-              <select id="modelSelect"></select>
-              <div id="modelHint" class="model-hint"></div>
-              <div id="directConfigPanel" class="direct-config-panel">
-                <label>
-                  <span>常用模型</span>
-                  <select id="directPresetSelect">
-                    <option value="">手动填写</option>
-                    <option value="MiniMax-M3" data-base-url="https://api.minimaxi.com/v1">MiniMax M3（国内平台）</option>
-                    <option value="MiniMax-M3" data-base-url="https://api.minimax.io/v1">MiniMax M3（国际平台）</option>
-                    <option value="deepseek-chat" data-base-url="https://api.deepseek.com/v1">DeepSeek Chat</option>
-                    <option value="qwen-plus" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">通义千问 qwen-plus</option>
-                    <option value="gpt-4o-mini" data-base-url="https://api.openai.com/v1">OpenAI gpt-4o-mini</option>
-                  </select>
-                </label>
-                <label>
-                  <span>Base URL</span>
-                  <input id="directBaseUrlInput" class="text-input" placeholder="例如 https://api.deepseek.com/v1" />
-                </label>
-                <label>
-                  <span>API Key</span>
-                  <input id="directApiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="只保存到本机后端，接口不会明文回显" />
-                </label>
-                <label>
-                  <span>模型名</span>
-                  <input id="directModelInput" class="text-input" placeholder="例如 deepseek-chat / qwen-plus" />
-                </label>
-                <div class="action-bar">
-                  <button class="secondary-button compact" id="saveDirectConfigButton" type="button">
-                    <i data-lucide="save"></i>
-                    保存配置
-                  </button>
-                  <button class="secondary-button compact" id="testDirectConfigButton" type="button">
-                    <i data-lucide="activity"></i>
-                    测试配置
+            <div class="top-actions">
+              <span class="status-pill"><span class="status-dot"></span>RAG 服务已连接</span>
+              <a class="btn-ghost" href="./admin.html">查看后台</a>
+              <a class="btn-ghost" href="./login.html">连接后端</a>
+              <button class="btn-ghost danger" id="logoutButton" type="button">退出</button>
+            </div>
+          </div>
+
+          <div class="grid qa-grid">
+            <aside class="grid">
+              <section class="card import-card">
+                <div class="import-head">
+                  <h2>导入材料</h2>
+                  <div class="tabs" role="tablist" aria-label="导入方式">
+                    <button class="tab active" data-import-tab="local" type="button">本地文件</button>
+                    <button class="tab" data-import-tab="url" type="button">网页 URL</button>
+                  </div>
+                </div>
+
+                <div class="import-body">
+                  <div id="importLocal" class="import-section active">
+                    <label class="dropzone" for="fileInput" id="dropZone">
+                      <div>
+                        <div class="drop-icon"><i data-lucide="file-up"></i></div>
+                        <b>选择或拖入文件</b>
+                        <span>支持多选，也可以分多次选择；文件先进入待上传列表，再统一提交到知识库。</span>
+                      </div>
+                    </label>
+                    <input id="fileInput" class="native-file-input" type="file" multiple />
+                    <div id="filePreview" class="pending-list empty compact-empty">尚未选择文件。</div>
+                    <div class="import-actions">
+                      <button class="btn-primary" id="uploadButton" type="button">
+                        <i data-lucide="upload-cloud"></i>
+                        上传待选文件
+                      </button>
+                      <button class="btn-ghost" id="clearFilesButton" type="button">
+                        <i data-lucide="x"></i>
+                        清空
+                      </button>
+                    </div>
+                    <div id="importNotice" class="notice inline-notice"></div>
+                  </div>
+
+                  <div id="importUrl" class="import-section">
+                    <div class="field">
+                      <label class="label" for="urlInput">网页 URL</label>
+                      <textarea id="urlInput" rows="5" placeholder="https://example.com/page&#10;https://example.com/another-page"></textarea>
+                    </div>
+                    <button class="btn-primary full-width" id="urlButton" type="button">
+                      <i data-lucide="globe-2"></i>
+                      导入 / 刷新 URL
+                    </button>
+                    <div id="urlNotice" class="notice inline-notice"></div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="card source-card">
+                <div class="card-title">
+                  <div>
+                    <h2>资料源</h2>
+                    <p class="desc">状态为“可检索”的资料会参与本次问答。</p>
+                  </div>
+                  <button class="btn-ghost compact" id="refreshSourcesButton" type="button">刷新</button>
+                </div>
+                <div id="sourceList" class="source-list"></div>
+              </section>
+            </aside>
+
+            <section class="grid">
+              <section class="card question-card" id="model-config">
+                <div class="card-title">
+                  <div>
+                    <h2>RAG 问答 vs LLM 大模型问答</h2>
+                    <p class="desc">同题对比，辅助核验</p>
+                  </div>
+                </div>
+
+                <div class="question-layout">
+                  <div class="field">
+                    <label class="label" for="questionInput">问题</label>
+                    <textarea id="questionInput" rows="5" placeholder="例如：采购中心系统第一阶段，需要先和甲方确认哪些内容？"></textarea>
+                  </div>
+
+                  <div class="model-panel">
+                    <div class="model-head">
+                      <label class="label" for="modelSelect">LLM 大模型</label>
+                      <button class="text-button compact-link" id="toggleDirectConfigButton" type="button">收起配置</button>
+                    </div>
+                    <select id="modelSelect"></select>
+                    <div id="modelHint" class="model-hint"></div>
+
+                    <div id="directConfigPanel" class="direct-config-panel">
+                      <label>
+                        <span>常用模型</span>
+                        <select id="directPresetSelect">
+                          <option value="">手动填写</option>
+                          <option value="MiniMax-M3" data-base-url="https://api.minimaxi.com/v1">MiniMax M3（国内平台）</option>
+                          <option value="MiniMax-M3" data-base-url="https://api.minimax.io/v1">MiniMax M3（国际平台）</option>
+                          <option value="deepseek-chat" data-base-url="https://api.deepseek.com/v1">DeepSeek Chat</option>
+                          <option value="qwen-plus" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">通义千问 qwen-plus</option>
+                          <option value="gpt-4o-mini" data-base-url="https://api.openai.com/v1">OpenAI gpt-4o-mini</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Base URL</span>
+                        <input id="directBaseUrlInput" class="text-input" placeholder="例如 https://api.deepseek.com/v1" />
+                      </label>
+                      <label>
+                        <span>API Key</span>
+                        <input id="directApiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="只保存到本机后端，接口不会明文回显" />
+                      </label>
+                      <label>
+                        <span>模型名</span>
+                        <input id="directModelInput" class="text-input" placeholder="例如 deepseek-chat / qwen-plus" />
+                      </label>
+                      <div class="config-actions compact-actions">
+                        <button class="btn-ghost" id="saveDirectConfigButton" type="button">
+                          <i data-lucide="save"></i>
+                          保存配置
+                        </button>
+                        <button class="btn-ghost" id="testDirectConfigButton" type="button">
+                          <i data-lucide="activity"></i>
+                          测试配置
+                        </button>
+                      </div>
+                      <div id="directConfigNotice" class="model-hint"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="ask-footer">
+                  <label class="toggle">
+                    <input id="refreshUrlsToggle" type="checkbox" checked />
+                    <span>回答前刷新 URL 源</span>
+                  </label>
+                  <button class="btn-primary" id="askButton" type="button">
+                    <i data-lucide="split-square-horizontal"></i>
+                    对比问答
                   </button>
                 </div>
-                <div id="directConfigNotice" class="model-hint"></div>
-              </div>
-              <label class="toggle">
-                <input id="refreshUrlsToggle" type="checkbox" checked />
-                <span>回答前刷新 URL 源</span>
-              </label>
-              <button class="primary-button" id="askButton" type="button">
-                <i data-lucide="split-square-horizontal"></i>
-                对比问答
-              </button>
-            </div>
+                <div id="notice" class="notice"></div>
+
+                <div class="inline-metrics">
+                  <div class="inline-metric"><b id="sourceCountMetric">0</b><span>资料源</span></div>
+                  <div class="inline-metric"><b id="readyCountMetric">0</b><span>可检索</span></div>
+                  <div class="inline-metric"><b id="modelMetric">LLM</b><span>对比通道</span></div>
+                </div>
+              </section>
+
+              <section class="answer-grid">
+                <article class="card answer-card">
+                  <div class="answer-head">
+                    <b>RAG 知识库回答</b>
+                    <span id="ragMeta" class="state green">未运行</span>
+                  </div>
+                  <pre id="ragAnswer" class="answer-box answer-body">等待提问。</pre>
+                  <div class="citations">
+                    <h3>引用来源</h3>
+                    <div id="references" class="references citation-list"></div>
+                  </div>
+                </article>
+
+                <article class="card answer-card">
+                  <div class="answer-head">
+                    <b>LLM 大模型回答</b>
+                    <span id="directMeta" class="state gray">未运行</span>
+                  </div>
+                  <pre id="directAnswer" class="answer-box answer-body">等待提问。</pre>
+                  <div class="answer-foot">由通用模型生成，不提供知识库引用。</div>
+                </article>
+              </section>
+            </section>
           </div>
-          <div id="notice" class="notice"></div>
-        </section>
 
-        <section class="compare-grid">
-          <article class="answer-card">
-            <div class="section-title">
-              <h2>RAG 问答</h2>
-              <span id="ragMeta" class="badge">未运行</span>
-            </div>
-            <pre id="ragAnswer" class="answer-box">等待提问。</pre>
-            <div>
-              <h3>引用来源</h3>
-              <div id="references" class="references"></div>
-            </div>
-          </article>
-
-          <article class="answer-card">
-            <div class="section-title">
-              <h2>LLM大模型问答</h2>
-              <span id="directMeta" class="badge muted-badge">未运行</span>
-            </div>
-            <pre id="directAnswer" class="answer-box">等待提问。</pre>
-          </article>
+          <div class="footer-note">@copyright 上海维睿塔数字科技 RAG开发环境</div>
         </section>
       </main>
-    </div>
+    </section>
   </body>
 </html>
