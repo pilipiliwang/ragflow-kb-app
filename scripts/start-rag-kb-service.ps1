@@ -1,7 +1,8 @@
 param(
   [string]$PagesUrl = "",
   [string]$AppUrl = "http://localhost:4317",
-  [string]$RagflowApiUrl = "http://localhost:9380"
+  [string]$RagflowApiUrl = "http://localhost:9380",
+  [string]$LocalApiKey = "local-dev-key"
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +14,8 @@ $LogDir = Join-Path $AppDir "data\logs"
 $AppLog = Join-Path $LogDir "rag-kb-app.log"
 if (!$PagesUrl) {
   $cacheVersion = Get-Date -Format "yyyyMMddHHmmss"
-  $PagesUrl = "https://pilipiliwang.github.io/ragflow-kb-app/login.html?api=http%3A%2F%2Flocalhost%3A4317&v=$cacheVersion"
+  $encodedKey = [uri]::EscapeDataString($LocalApiKey)
+  $PagesUrl = "https://pilipiliwang.github.io/ragflow-kb-app/login.html?api=http%3A%2F%2Flocalhost%3A4317&key=$encodedKey&v=$cacheVersion"
 }
 
 function Write-Step {
@@ -82,6 +84,32 @@ function Test-DockerReady {
   }
 }
 
+function Test-AppApiKey {
+  try {
+    $headers = @{ "X-API-Key" = $LocalApiKey }
+    $response = Invoke-WebRequest -UseBasicParsing -Uri "$AppUrl/api/health" -Headers $headers -TimeoutSec 8
+    return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500)
+  } catch {
+    return $false
+  }
+}
+
+function Stop-AppListener {
+  $connections = Get-NetTCPConnection -LocalPort 4317 -State Listen -ErrorAction SilentlyContinue
+  if (!$connections) {
+    return
+  }
+
+  $processIds = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+  foreach ($processId in $processIds) {
+    $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+    if ($process) {
+      Write-Step "Stopping existing App backend process: $($process.Id)"
+      Stop-Process -Id $process.Id -Force
+    }
+  }
+}
+
 function Start-DockerDesktop {
   $dockerDesktop = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
   if (Test-Path -LiteralPath $dockerDesktop) {
@@ -147,19 +175,27 @@ function Start-App {
   }
 
   if (Wait-Http -Url $AppUrl -TimeoutSeconds 3) {
-    Write-Step "App backend is already running: $AppUrl"
-    return
+    if (Test-AppApiKey) {
+      Write-Step "App backend is already running: $AppUrl"
+      return
+    }
+    Write-Step "App backend is running without the expected local API key. Restarting it..."
+    Stop-AppListener
   }
 
   New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
   Write-Step "Starting App backend. Log: $AppLog"
   $escapedAppDir = $AppDir.Replace("'", "''")
   $escapedLog = $AppLog.Replace("'", "''")
-  $command = "Set-Location -LiteralPath '$escapedAppDir'; npm start *> '$escapedLog'"
+  $escapedKey = $LocalApiKey.Replace("'", "''")
+  $command = "Set-Location -LiteralPath '$escapedAppDir'; `$env:EXTERNAL_API_KEYS='$escapedKey'; npm start *> '$escapedLog'"
   Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $command) -WindowStyle Hidden
 
   if (!(Wait-Http -Url $AppUrl -TimeoutSeconds 60)) {
     throw "App backend did not respond within 60 seconds. Check log: $AppLog"
+  }
+  if (!(Test-AppApiKey)) {
+    throw "App backend started, but local API key is not accepted. Check log: $AppLog"
   }
 
   Write-Step "App backend is responding: $AppUrl"
@@ -173,4 +209,5 @@ Write-Host ""
 Write-Host "RAG knowledge service is ready."
 Write-Host "Local App: $AppUrl"
 Write-Host "RAGFlow API: $RagflowApiUrl"
+Write-Host "Local API Key: $LocalApiKey"
 Write-Host "GitHub Pages: $PagesUrl"
