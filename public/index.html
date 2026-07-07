@@ -110,7 +110,8 @@
                   <span>常用模型</span>
                   <select id="directPresetSelect">
                     <option value="">手动填写</option>
-                    <option value="MiniMax-M3" data-base-url="https://api.minimax.io/v1">MiniMax M3</option>
+                    <option value="MiniMax-M3" data-base-url="https://api.minimaxi.com/v1">MiniMax M3（国内平台）</option>
+                    <option value="MiniMax-M3" data-base-url="https://api.minimax.io/v1">MiniMax M3（国际平台）</option>
                     <option value="deepseek-chat" data-base-url="https://api.deepseek.com/v1">DeepSeek Chat</option>
                     <option value="qwen-plus" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">通义千问 qwen-plus</option>
                     <option value="gpt-4o-mini" data-base-url="https://api.openai.com/v1">OpenAI gpt-4o-mini</option>
@@ -128,10 +129,16 @@
                   <span>模型名</span>
                   <input id="directModelInput" class="text-input" placeholder="例如 deepseek-chat / qwen-plus" />
                 </label>
-                <button class="secondary-button compact" id="saveDirectConfigButton" type="button">
-                  <i data-lucide="save"></i>
-                  保存直接模型配置
-                </button>
+                <div class="action-bar">
+                  <button class="secondary-button compact" id="saveDirectConfigButton" type="button">
+                    <i data-lucide="save"></i>
+                    保存配置
+                  </button>
+                  <button class="secondary-button compact" id="testDirectConfigButton" type="button">
+                    <i data-lucide="activity"></i>
+                    测试配置
+                  </button>
+                </div>
                 <div id="directConfigNotice" class="model-hint"></div>
               </div>
               <label class="toggle">

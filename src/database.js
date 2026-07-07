@@ -32,6 +32,14 @@ const DEFAULT_SETTINGS = {
 
 const SECRET_KEYS = new Set(["ragflowApiKey", "directApiKey", "externalApiKeys"]);
 
+function normalizeSecretInput(key, value) {
+  const text = String(value || "").trim();
+  if (key === "directApiKey") {
+    return text.replace(/^Bearer\s+/i, "").replace(/^["']|["']$/g, "").trim();
+  }
+  return text;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -236,8 +244,9 @@ export class AppDatabase {
     }
 
     for (const key of SECRET_KEYS) {
-      if (String(payload[key] || "").trim()) {
-        this.setSettingValue(key, String(payload[key]).trim(), true);
+      const secretValue = normalizeSecretInput(key, payload[key]);
+      if (secretValue) {
+        this.setSettingValue(key, secretValue, true);
       }
       if (payload[`clear${key[0].toUpperCase()}${key.slice(1)}`]) {
         this.setSettingValue(key, "", true);

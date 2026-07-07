@@ -35,6 +35,7 @@ const els = {
   directApiKeyInput: document.querySelector("#directApiKeyInput"),
   directModelInput: document.querySelector("#directModelInput"),
   saveDirectConfigButton: document.querySelector("#saveDirectConfigButton"),
+  testDirectConfigButton: document.querySelector("#testDirectConfigButton"),
   directConfigNotice: document.querySelector("#directConfigNotice"),
   refreshUrlsToggle: document.querySelector("#refreshUrlsToggle"),
   askButton: document.querySelector("#askButton"),
@@ -56,7 +57,7 @@ function setBusy(scope, value) {
     upload: [els.uploadButton, els.clearFilesButton, els.fileInput],
     url: [els.urlButton, els.urlInput],
     source: [els.refreshSourcesButton],
-    settings: [els.saveDirectConfigButton, els.directPresetSelect, els.directBaseUrlInput, els.directApiKeyInput, els.directModelInput],
+    settings: [els.saveDirectConfigButton, els.testDirectConfigButton, els.directPresetSelect, els.directBaseUrlInput, els.directApiKeyInput, els.directModelInput],
     ask: [els.askButton]
   };
 
@@ -368,15 +369,15 @@ async function saveDirectConfig() {
 
   if (!directBaseUrl) {
     els.directConfigNotice.textContent = "请填写 Base URL。";
-    return;
+    return false;
   }
   if (!directModel) {
     els.directConfigNotice.textContent = "请填写模型名，例如 deepseek-chat 或 qwen-plus。";
-    return;
+    return false;
   }
   if (!directApiKey && !state.settings?.secrets?.directApiKey) {
     els.directConfigNotice.textContent = "请填写 API Key。";
-    return;
+    return false;
   }
 
   const availableModels = [...new Set([
@@ -403,8 +404,31 @@ async function saveDirectConfig() {
     els.directConfigPanel.hidden = false;
     els.toggleDirectConfigButton.textContent = "收起配置";
     els.directConfigNotice.textContent = "已保存直接大模型配置。现在可以运行右侧直接模型对比。";
+    return true;
   } catch (error) {
     els.directConfigNotice.textContent = `保存失败：${error.message}`;
+    return false;
+  } finally {
+    setBusy("settings", false);
+  }
+}
+
+async function testDirectConfig() {
+  const saved = await saveDirectConfig();
+  if (!saved) return;
+  if (!state.settings?.secrets?.directApiKey || !state.settings?.directModel) return;
+
+  setBusy("settings", true);
+  els.directConfigNotice.textContent = "正在测试直接模型配置...";
+  try {
+    const payload = await requestJson("/api/settings/test-direct", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "请只回复 OK。" })
+    });
+    els.directConfigNotice.textContent = `测试成功：${payload.model}，${payload.elapsedMs}ms。`;
+  } catch (error) {
+    els.directConfigNotice.textContent = `测试失败：${error.message}`;
   } finally {
     setBusy("settings", false);
   }
@@ -513,6 +537,7 @@ els.filePreview.addEventListener("click", (event) => {
 els.toggleDirectConfigButton.addEventListener("click", toggleDirectConfig);
 els.directPresetSelect.addEventListener("change", applyDirectPreset);
 els.saveDirectConfigButton.addEventListener("click", saveDirectConfig);
+els.testDirectConfigButton.addEventListener("click", testDirectConfig);
 els.sourceList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-source]");
   if (button) deleteSource(button.dataset.deleteSource);

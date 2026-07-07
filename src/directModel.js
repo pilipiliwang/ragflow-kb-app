@@ -7,9 +7,42 @@ function timeoutMs() {
   return Number.isFinite(value) && value > 0 ? value : 60000;
 }
 
+function normalizeApiKey(apiKey) {
+  return String(apiKey || "")
+    .trim()
+    .replace(/^Bearer\s+/i, "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
+}
+
+function providerName(baseUrl) {
+  const text = String(baseUrl || "").toLowerCase();
+  if (text.includes("minimax")) return "MiniMax";
+  if (text.includes("deepseek")) return "DeepSeek";
+  if (text.includes("dashscope") || text.includes("aliyuncs")) return "通义千问";
+  if (text.includes("openai")) return "OpenAI";
+  return "直接模型";
+}
+
+function summarizeProviderError(status, text, baseUrl) {
+  let message = text.slice(0, 500);
+  try {
+    const payload = JSON.parse(text);
+    message = payload.error?.message || payload.message || payload.msg || message;
+  } catch {
+    // Keep raw text when the provider does not return JSON.
+  }
+
+  const provider = providerName(baseUrl);
+  if (status === 401 || /invalid api key|unauthorized|authorized_error/i.test(message)) {
+    return `${provider} API Key 无效或不属于当前 Base URL。请在对应模型平台重新复制 API Key，只填 key 本身，不要带 Bearer、引号或网页登录 token。供应商返回：${message}`;
+  }
+  return `${provider} HTTP ${status}: ${message}`;
+}
+
 export async function answerDirectly(settings, question, fetchImpl = fetch) {
   const baseUrl = normalizeBaseUrl(settings.directBaseUrl || "https://api.openai.com/v1");
-  const apiKey = settings.directApiKey;
+  const apiKey = normalizeApiKey(settings.directApiKey);
   const model = settings.directModel;
 
   if (!apiKey) throw new Error("Direct model API key is not configured.");
@@ -56,7 +89,7 @@ export async function answerDirectly(settings, question, fetchImpl = fetch) {
 
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`Direct model HTTP ${response.status}: ${text.slice(0, 500)}`);
+    throw new Error(summarizeProviderError(response.status, text, baseUrl));
   }
 
   const payload = JSON.parse(text);

@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { clearAccessCookie, hasAccess, requireExternalApiKey, requirePageAccess, setAccessCookie, verifyExternalApiKey, verifyInviteCode } from "./auth.js";
 import { createDatabase } from "./database.js";
 import { compareAnswers } from "./compareService.js";
+import { answerDirectly } from "./directModel.js";
 import { randomId } from "./crypto.js";
 import { JobRunner } from "./jobQueue.js";
 import { RagflowClient, ensureRagflowResources } from "./ragflow.js";
@@ -393,6 +394,26 @@ app.post("/api/settings", async (req, res, next) => {
     res.json(db.getSettings({ includeSecrets: false }));
   } catch (error) {
     next(error);
+  }
+});
+
+app.post("/api/settings/test-direct", async (req, res) => {
+  const settings = db.getSettings({ includeSecrets: true });
+  const question = String(req.body?.question || "请只回复 OK。").trim();
+  try {
+    const started = Date.now();
+    const result = await answerDirectly(settings, question);
+    res.json({
+      ok: true,
+      model: result.model,
+      elapsedMs: Date.now() - started,
+      answerPreview: String(result.answer || "").slice(0, 120)
+    });
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      error: error.message
+    });
   }
 });
 
