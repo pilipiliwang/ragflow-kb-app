@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
+    "start:rag": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-rag-kb-service.ps1",
     "dev": "node --watch src/server.js",
     "test": "node --test"
   },
