@@ -264,14 +264,31 @@ async function waitForParse(source, db, client, datasetId, documentId, contextMe
 }
 
 function parseStatusMessage(document, status) {
-  if (status === "ready") return "Parsed by RAGFlow and ready for retrieval.";
-  if (status === "error") {
-    return document?.error
+  if (status === "ready") return "已解析完成，可参与 RAG 检索。";
+
+  const rawMessage = String(
+    document?.error
       || document?.status_message
       || document?.progress_msg
-      || "RAGFlow document parse failed.";
+      || document?.message
+      || ""
+  ).trim();
+  const hasEmbeddingError = /embedding|dashscope|ssl|httpsconnectionpool|max retries/i.test(rawMessage);
+
+  if (status === "error") {
+    if (hasEmbeddingError) {
+      return "解析失败：向量化模型连接失败，请检查 embedding 模型、API Key 或网络后重试。";
+    }
+    const lastLine = rawMessage.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).pop();
+    return lastLine ? `解析失败：${lastLine.slice(0, 180)}` : "RAG 资料解析失败。";
   }
-  return document?.progress_msg || "Parse requested; RAGFlow is still processing the document.";
+
+  if (hasEmbeddingError) {
+    return "RAG 正在解析；部分页段向量化请求失败，可能是 embedding 服务网络不稳定。";
+  }
+  return rawMessage && rawMessage.length < 180
+    ? rawMessage
+    : "RAG 正在解析，稍后刷新查看结果。";
 }
 
 export async function importFileSource(db, file) {
@@ -421,7 +438,10 @@ export async function refreshAllUrlSources(db) {
 export async function syncSourceStatuses(db) {
   const sources = db.listSources()
     .filter((source) => source.ragflow_document_id)
-    .filter((source) => ["uploading", "parsing", "refreshing", "pending"].includes(source.status));
+    .filter((source) => (
+      ["uploading", "parsing", "refreshing", "pending", "error"].includes(source.status)
+      || (source.status === "ready" && source.status_message !== "已解析完成，可参与 RAG 检索。")
+    ));
 
   if (!sources.length) return db.listSources();
 
@@ -441,7 +461,7 @@ export async function syncSourceStatuses(db) {
         source.ragflow_document_id
       );
       const status = normalizeRunState(document);
-      if (status !== "ready" && status !== "error") continue;
+      if (status !== "ready" && status !== "error" && status !== "parsing") continue;
 
       db.updateSourceStatus(source.id, {
         status,

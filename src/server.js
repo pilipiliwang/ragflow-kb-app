@@ -5,7 +5,7 @@ import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
 import { clearAccessCookie, hasAccess, requireExternalApiKey, requirePageAccess, setAccessCookie, verifyExternalApiKey, verifyInviteCode } from "./auth.js";
-import { createDatabase } from "./database.js";
+import { createDatabase, importPortableData } from "./database.js";
 import { compareAnswers } from "./compareService.js";
 import { answerDirectly } from "./directModel.js";
 import { randomId } from "./crypto.js";
@@ -30,6 +30,14 @@ const upload = multer({
 });
 
 const db = await createDatabase(dataFile);
+const legacyDataFile = path.resolve(rootDir, "./data/local-api.sqlite");
+const legacyImport = await importPortableData(db, legacyDataFile);
+if (legacyImport.sources || legacyImport.qaHistory || legacyImport.jobs) {
+  console.log(
+    `Imported legacy data from ${legacyDataFile}: `
+    + `${legacyImport.sources} sources, ${legacyImport.qaHistory} QA records, ${legacyImport.jobs} jobs.`
+  );
+}
 
 function parseUrls(payload = {}) {
   const rawUrls = Array.isArray(payload.urls)

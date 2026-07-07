@@ -2,7 +2,8 @@ param(
   [string]$PagesUrl = "",
   [string]$AppUrl = "http://localhost:4317",
   [string]$RagflowApiUrl = "http://localhost:9380",
-  [string]$LocalApiKey = "local-dev-key"
+  [string]$LocalApiKey = "local-dev-key",
+  [string]$AppSecret = "local-dev-secret-change-me"
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,7 @@ $RootDir = Split-Path -Parent $AppDir
 $RagflowDir = Join-Path $RootDir "ragflow\docker"
 $LogDir = Join-Path $AppDir "data\logs"
 $AppLog = Join-Path $LogDir "rag-kb-app.log"
+$AppDataFile = Join-Path $AppDir "data\app.sqlite"
 if (!$PagesUrl) {
   $cacheVersion = Get-Date -Format "yyyyMMddHHmmss"
   $encodedKey = [uri]::EscapeDataString($LocalApiKey)
@@ -247,7 +249,9 @@ function Start-App {
   $escapedAppDir = $AppDir.Replace("'", "''")
   $escapedLog = $AppLog.Replace("'", "''")
   $escapedKey = $LocalApiKey.Replace("'", "''")
-  $command = "Set-Location -LiteralPath '$escapedAppDir'; `$env:EXTERNAL_API_KEYS='$escapedKey'; npm start *> '$escapedLog'"
+  $escapedSecret = $AppSecret.Replace("'", "''")
+  $escapedDataFile = $AppDataFile.Replace("'", "''")
+  $command = "Set-Location -LiteralPath '$escapedAppDir'; `$env:EXTERNAL_API_KEYS='$escapedKey'; `$env:APP_SECRET='$escapedSecret'; `$env:SQLITE_PATH='$escapedDataFile'; npm start *> '$escapedLog'"
   Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $command) -WindowStyle Hidden
 
   if (!(Wait-Http -Url $AppUrl -TimeoutSeconds 60)) {

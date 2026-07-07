@@ -76,6 +76,128 @@ export async function createDatabase(filePath) {
   return store;
 }
 
+function tableExists(db, tableName) {
+  const statement = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?");
+  statement.bind([tableName]);
+  return Boolean(oneObject(statement));
+}
+
+function rowExists(db, tableName, id) {
+  const statement = db.prepare(`SELECT id FROM ${tableName} WHERE id = ?`);
+  statement.bind([id]);
+  return Boolean(oneObject(statement));
+}
+
+function legacyRows(db, tableName) {
+  if (!tableExists(db, tableName)) return [];
+  return rowObjects(db.prepare(`SELECT * FROM ${tableName}`));
+}
+
+export async function importPortableData(target, sourceFilePath) {
+  const resolvedSource = path.resolve(sourceFilePath);
+  const resolvedTarget = path.resolve(target.filePath);
+  const result = { sources: 0, qaHistory: 0, jobs: 0, skipped: false };
+  if (resolvedSource === resolvedTarget) {
+    result.skipped = true;
+    return result;
+  }
+
+  let file;
+  try {
+    file = await fs.readFile(resolvedSource);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      result.skipped = true;
+      return result;
+    }
+    throw error;
+  }
+
+  const SQL = await sqlRuntime();
+  const legacyDb = new SQL.Database(new Uint8Array(file));
+  try {
+    for (const row of legacyRows(legacyDb, "sources")) {
+      if (!row.id || rowExists(target.db, "sources", row.id)) continue;
+      target.db.run(
+        `INSERT INTO sources (
+          id, kind, title, url, file_name, ragflow_dataset_id, ragflow_document_id,
+          status, status_message, size, content_hash, created_at, updated_at, refreshed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.id,
+          row.kind || "file",
+          row.title || row.file_name || row.url || "Untitled",
+          row.url || "",
+          row.file_name || "",
+          row.ragflow_dataset_id || "",
+          row.ragflow_document_id || "",
+          row.status || "pending",
+          row.status_message || "",
+          row.size || 0,
+          row.content_hash || "",
+          row.created_at || nowIso(),
+          row.updated_at || row.created_at || nowIso(),
+          row.refreshed_at || null
+        ]
+      );
+      result.sources += 1;
+    }
+
+    for (const row of legacyRows(legacyDb, "qa_history")) {
+      if (!row.id || rowExists(target.db, "qa_history", row.id)) continue;
+      target.db.run(
+        `INSERT INTO qa_history (
+          id, question, rag_answer, rag_references, direct_answer,
+          rag_model, direct_model, warnings, errors, timings, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.id,
+          row.question || "",
+          row.rag_answer || "",
+          row.rag_references || "[]",
+          row.direct_answer || "",
+          row.rag_model || "",
+          row.direct_model || "",
+          row.warnings || "[]",
+          row.errors || "[]",
+          row.timings || "{}",
+          row.created_at || nowIso()
+        ]
+      );
+      result.qaHistory += 1;
+    }
+
+    for (const row of legacyRows(legacyDb, "jobs")) {
+      if (!row.id || rowExists(target.db, "jobs", row.id)) continue;
+      target.db.run(
+        `INSERT INTO jobs (
+          id, type, status, payload, result, error, progress,
+          created_at, updated_at, started_at, finished_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.id,
+          row.type || "unknown",
+          row.status || "queued",
+          row.payload || "{}",
+          row.result || "",
+          row.error || "",
+          row.progress || 0,
+          row.created_at || nowIso(),
+          row.updated_at || row.created_at || nowIso(),
+          row.started_at || null,
+          row.finished_at || null
+        ]
+      );
+      result.jobs += 1;
+    }
+  } finally {
+    legacyDb.close();
+  }
+
+  if (result.sources || result.qaHistory || result.jobs) await target.save();
+  return result;
+}
+
 export class AppDatabase {
   constructor(db, filePath) {
     this.db = db;
@@ -149,7 +271,14 @@ export class AppDatabase {
   async save() {
     await fs.mkdir(path.dirname(this.filePath), { recursive: true });
     const data = this.db.export();
-    await fs.writeFile(this.filePath, Buffer.from(data));
+    const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await fs.writeFile(tempPath, Buffer.from(data));
+      await fs.rename(tempPath, this.filePath);
+    } catch (error) {
+      await fs.unlink(tempPath).catch(() => {});
+      throw error;
+    }
   }
 
   async bootstrapFromEnv() {

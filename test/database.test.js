@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createDatabase } from "../src/database.js";
+import { createDatabase, importPortableData } from "../src/database.js";
 
 async function tempDbPath() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "rag-kb-db-"));
@@ -60,4 +60,52 @@ test("jobs are persisted and parsed", async () => {
   assert.deepEqual(saved.payload, { urls: ["https://example.com"] });
   assert.deepEqual(saved.result, { imported: 1 });
   assert.equal(reopened.listJobs({ limit: 10 }).count, 1);
+});
+
+test("legacy portable data is imported without secrets", async () => {
+  process.env.APP_SECRET = "legacy-import-secret";
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "rag-kb-legacy-"));
+  const mainPath = path.join(dir, "app.sqlite");
+  const legacyPath = path.join(dir, "local-api.sqlite");
+
+  const legacy = await createDatabase(legacyPath);
+  legacy.upsertSource({
+    id: "src-legacy",
+    kind: "file",
+    title: "Legacy.pdf",
+    fileName: "Legacy.pdf",
+    ragflowDatasetId: "ds1",
+    ragflowDocumentId: "doc1",
+    status: "ready",
+    statusMessage: "ready"
+  });
+  legacy.addQaHistory({
+    question: "legacy question",
+    ragAnswer: "legacy answer",
+    directAnswer: "direct answer",
+    ragReferences: [],
+    warnings: [],
+    errors: [],
+    timings: {}
+  });
+  const job = legacy.createJob("refresh_urls", { urls: ["https://example.com"] });
+  legacy.updateJob(job.id, { status: "completed", progress: 100, result: { ok: true } });
+  legacy.updateSettings({ directApiKey: "do-not-import" });
+  await legacy.save();
+
+  const main = await createDatabase(mainPath);
+  const result = await importPortableData(main, legacyPath);
+
+  assert.equal(result.sources, 1);
+  assert.equal(result.qaHistory, 1);
+  assert.equal(result.jobs, 1);
+  assert.equal(main.listSources().length, 1);
+  assert.equal(main.listQaHistory({ limit: 10 }).count, 1);
+  assert.equal(main.listJobs({ limit: 10 }).count, 1);
+  assert.equal(main.getSettings({ includeSecrets: true }).directApiKey, "");
+
+  const secondResult = await importPortableData(main, legacyPath);
+  assert.equal(secondResult.sources, 0);
+  assert.equal(secondResult.qaHistory, 0);
+  assert.equal(secondResult.jobs, 0);
 });

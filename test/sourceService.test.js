@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDatabase } from "../src/database.js";
-import { refreshUrlSource } from "../src/sourceService.js";
+import { refreshUrlSource, syncSourceStatuses } from "../src/sourceService.js";
 
 function ragflowResponse(data, status = 200) {
   return new Response(JSON.stringify({ code: 0, data }), {
@@ -122,6 +122,52 @@ test("refreshUrlSource uses reader fallback when direct backend fetch is blocked
     assert.equal(source.title, "Reader Title");
     assert.equal(source.ragflow_document_id, "doc-reader");
     assert.match(source.status_message, /reader fallback/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("syncSourceStatuses moves a retried error source back to parsing", async () => {
+  process.env.APP_SECRET = "source-service-retry-secret";
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "rag-kb-source-retry-"));
+  const db = await createDatabase(path.join(dir, "app.sqlite"));
+  db.updateSettings({
+    ragflowBaseUrl: "http://ragflow.mock",
+    ragflowApiKey: "rag-key",
+    ragflowDatasetName: "kb",
+    ragflowDatasetId: "ds1",
+    ragflowChatName: "assistant",
+    ragflowChatId: "chat1"
+  });
+  db.upsertSource({
+    id: "src-retry",
+    kind: "file",
+    title: "Retry.pdf",
+    fileName: "Retry.pdf",
+    ragflowDatasetId: "ds1",
+    ragflowDocumentId: "doc-retry",
+    status: "error",
+    statusMessage: "Previous parse failed."
+  });
+  await db.save();
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options = {}) => {
+    const textUrl = String(url);
+    if (textUrl === "http://ragflow.mock/api/v1/chats/chat1" && options.method === "PATCH") {
+      return ragflowResponse({ id: "chat1", dataset_ids: ["ds1"] });
+    }
+    if (textUrl.includes("/api/v1/datasets/ds1/documents?")) {
+      return ragflowResponse({ documents: [{ id: "doc-retry", name: "Retry.pdf", run: "RUNNING" }] });
+    }
+    throw new Error(`Unexpected fetch: ${textUrl}`);
+  };
+
+  try {
+    const sources = await syncSourceStatuses(db);
+    const source = sources.find((item) => item.id === "src-retry");
+    assert.equal(source.status, "parsing");
+    assert.match(source.status_message, /RAG 正在解析/);
   } finally {
     globalThis.fetch = originalFetch;
   }
