@@ -1,5 +1,5 @@
 param(
-  [string]$PagesUrl = "https://pilipiliwang.github.io/ragflow-kb-app/login.html?api=http%3A%2F%2Flocalhost%3A4317&v=2c989b8",
+  [string]$PagesUrl = "",
   [string]$AppUrl = "http://localhost:4317",
   [string]$RagflowApiUrl = "http://localhost:9380"
 )
@@ -11,6 +11,10 @@ $RootDir = Split-Path -Parent $AppDir
 $RagflowDir = Join-Path $RootDir "ragflow\docker"
 $LogDir = Join-Path $AppDir "data\logs"
 $AppLog = Join-Path $LogDir "rag-kb-app.log"
+if (!$PagesUrl) {
+  $cacheVersion = Get-Date -Format "yyyyMMddHHmmss"
+  $PagesUrl = "https://pilipiliwang.github.io/ragflow-kb-app/login.html?api=http%3A%2F%2Flocalhost%3A4317&v=$cacheVersion"
+}
 
 function Write-Step {
   param([string]$Message)
