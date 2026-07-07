@@ -1,5 +1,5 @@
 import { hashValue } from "./crypto.js";
-import { ensureRagflowResources } from "./ragflow.js";
+import { ensureRagflowResources, normalizeRunState } from "./ragflow.js";
 
 function documentIdFrom(uploadResult) {
   return uploadResult?.id || uploadResult?.document_id || uploadResult?.doc_id || "";
@@ -29,9 +29,25 @@ async function waitForParse(source, db, client, datasetId, documentId) {
   });
 }
 
+function parseStatusMessage(document, status) {
+  if (status === "ready") return "Parsed by RAGFlow and ready for retrieval.";
+  if (status === "error") {
+    return document?.error
+      || document?.status_message
+      || document?.progress_msg
+      || "RAGFlow document parse failed.";
+  }
+  return document?.progress_msg || "Parse requested; RAGFlow is still processing the document.";
+}
+
 export async function importFileSource(db, file) {
   const settings = db.getSettings({ includeSecrets: true });
-  const resources = await ensureRagflowResources(db, settings);
+  let resources;
+  try {
+    resources = await ensureRagflowResources(db, settings);
+  } catch {
+    return db.listSources();
+  }
   await db.save();
 
   let source = db.upsertSource({
@@ -163,6 +179,45 @@ export async function refreshAllUrlSources(db) {
   }
 
   return { refreshed, warnings };
+}
+
+export async function syncSourceStatuses(db) {
+  const sources = db.listSources()
+    .filter((source) => source.ragflow_document_id)
+    .filter((source) => ["uploading", "parsing", "refreshing", "pending"].includes(source.status));
+
+  if (!sources.length) return db.listSources();
+
+  const settings = db.getSettings({ includeSecrets: true });
+  const resources = await ensureRagflowResources(db, settings);
+  let changed = false;
+
+  for (const source of sources) {
+    try {
+      const document = await resources.client.getDocument(
+        source.ragflow_dataset_id || resources.datasetId,
+        source.ragflow_document_id
+      );
+      const status = normalizeRunState(document);
+      if (status !== "ready" && status !== "error") continue;
+
+      db.updateSourceStatus(source.id, {
+        status,
+        statusMessage: parseStatusMessage(document, status),
+        refreshedAt: new Date().toISOString()
+      });
+      changed = true;
+    } catch (error) {
+      db.updateSourceStatus(source.id, {
+        status: "error",
+        statusMessage: error.message
+      });
+      changed = true;
+    }
+  }
+
+  if (changed) await db.save();
+  return db.listSources();
 }
 
 export async function removeSource(db, sourceId) {

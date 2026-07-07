@@ -64,7 +64,7 @@ function documentList(data) {
   return [];
 }
 
-function normalizeRunState(document) {
+export function normalizeRunState(document) {
   const raw = String(
     document?.run
       ?? document?.status

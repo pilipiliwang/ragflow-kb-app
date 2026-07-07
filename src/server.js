@@ -10,7 +10,7 @@ import { compareAnswers } from "./compareService.js";
 import { randomId } from "./crypto.js";
 import { JobRunner } from "./jobQueue.js";
 import { RagflowClient, ensureRagflowResources } from "./ragflow.js";
-import { importFileSource, refreshAllUrlSources, refreshUrlSource, removeSource } from "./sourceService.js";
+import { importFileSource, refreshAllUrlSources, refreshUrlSource, removeSource, syncSourceStatuses } from "./sourceService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -241,8 +241,12 @@ apiV1.get("/health", async (_req, res, next) => {
   }
 });
 
-apiV1.get("/sources", (_req, res) => {
-  res.json({ sources: db.listSources() });
+apiV1.get("/sources", async (_req, res, next) => {
+  try {
+    res.json({ sources: await syncSourceStatuses(db) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 apiV1.post("/sources/upload", upload.array("files", 10), async (req, res, next) => {
@@ -436,8 +440,12 @@ app.post("/api/sources/refresh-urls", async (req, res, next) => {
   }
 });
 
-app.get("/api/admin/sources", (_req, res) => {
-  res.json({ sources: db.listSources() });
+app.get("/api/admin/sources", async (_req, res, next) => {
+  try {
+    res.json({ sources: await syncSourceStatuses(db) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.delete("/api/admin/sources/:id", async (req, res, next) => {
