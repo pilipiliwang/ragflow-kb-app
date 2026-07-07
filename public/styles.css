@@ -147,6 +147,18 @@ svg {
   gap: 12px;
 }
 
+.section-help,
+.model-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.model-hint a {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
 .icon-button,
 .primary-button,
 .secondary-button,
@@ -233,6 +245,18 @@ svg {
   margin-bottom: 7px;
 }
 
+.model-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.compact-link {
+  min-height: 0;
+  padding: 0;
+}
+
 .text-input,
 textarea,
 select {
@@ -282,6 +306,39 @@ select:focus {
   display: none;
 }
 
+.file-preview {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.file-preview-head {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent-dark);
+}
+
+.file-preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.file-preview-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.compact-empty {
+  padding: 10px;
+  font-size: 12px;
+}
+
 .source-list,
 .admin-list,
 .history-list {
@@ -303,6 +360,20 @@ select:focus {
   font-size: 13px;
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+
+.source-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.source-delete {
+  width: 34px;
+  min-height: 34px;
+  color: var(--danger);
+  background: #fff;
 }
 
 .meta-row {
@@ -422,6 +493,18 @@ select:focus {
 .reference-item a {
   color: var(--accent-dark);
   font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.reference-title {
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.reference-excerpt {
+  color: var(--muted);
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 

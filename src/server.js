@@ -41,9 +41,28 @@ function isAsyncRequest(req) {
   return req.query.async === "true" || req.body?.async === true || req.body?.async === "true";
 }
 
+function repairUploadName(value) {
+  const text = String(value || "");
+  if (!/[\u0080-\u00ff]/.test(text)) return text;
+  try {
+    const decoded = Buffer.from(text, "latin1").toString("utf8");
+    return /[\u4e00-\u9fff]/.test(decoded) ? decoded : text;
+  } catch {
+    return text;
+  }
+}
+
+function normalizeUploadFile(file) {
+  return {
+    ...file,
+    originalname: repairUploadName(file.originalname)
+  };
+}
+
 async function importUploadedFiles(files) {
   const imported = [];
-  for (const file of files) {
+  for (const rawFile of files) {
+    const file = normalizeUploadFile(rawFile);
     try {
       imported.push(await importFileSource(db, file));
     } catch (error) {
@@ -60,7 +79,8 @@ async function importUploadedFiles(files) {
 async function stageUploadedFiles(files) {
   await fs.mkdir(uploadStagingDir, { recursive: true });
   const staged = [];
-  for (const file of files) {
+  for (const rawFile of files) {
+    const file = normalizeUploadFile(rawFile);
     const stagedName = `${randomId("upload")}-${path.basename(file.originalname || "file")}`;
     const stagedPath = path.join(uploadStagingDir, stagedName);
     await fs.writeFile(stagedPath, file.buffer);

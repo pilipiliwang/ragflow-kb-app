@@ -42,12 +42,7 @@ function parseStatusMessage(document, status) {
 
 export async function importFileSource(db, file) {
   const settings = db.getSettings({ includeSecrets: true });
-  let resources;
-  try {
-    resources = await ensureRagflowResources(db, settings);
-  } catch {
-    return db.listSources();
-  }
+  const resources = await ensureRagflowResources(db, settings);
   await db.save();
 
   let source = db.upsertSource({
@@ -189,7 +184,12 @@ export async function syncSourceStatuses(db) {
   if (!sources.length) return db.listSources();
 
   const settings = db.getSettings({ includeSecrets: true });
-  const resources = await ensureRagflowResources(db, settings);
+  let resources;
+  try {
+    resources = await ensureRagflowResources(db, settings);
+  } catch {
+    return db.listSources();
+  }
   let changed = false;
 
   for (const source of sources) {
