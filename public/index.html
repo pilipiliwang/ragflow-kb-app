@@ -20,9 +20,9 @@
         <div>
           <p class="nav-group-title">工作台</p>
           <nav class="nav">
-            <a class="nav-button active" href="./index.html">知识库问答</a>
+            <button class="nav-button active" data-page-target="qaPage" type="button">知识库问答</button>
             <a class="nav-button" href="./admin.html">知识库后台</a>
-            <a class="nav-button" href="#model-config">模型配置</a>
+            <button class="nav-button" data-page-target="modelPage" type="button">模型配置</button>
           </nav>
         </div>
 
@@ -34,7 +34,7 @@
       </aside>
 
       <main class="content">
-        <section class="page active">
+        <section id="qaPage" class="page active">
           <div class="topbar">
             <div>
               <div class="crumb">工作台 / 知识库问答</div>
@@ -110,7 +110,7 @@
             </aside>
 
             <section class="grid">
-              <section class="card question-card" id="model-config">
+              <section class="card question-card">
                 <div class="card-title">
                   <div>
                     <h2>RAG 问答 vs LLM 大模型问答</h2>
@@ -123,55 +123,10 @@
                     <label class="label" for="questionInput">问题</label>
                     <textarea id="questionInput" rows="5" placeholder="例如：采购中心系统第一阶段，需要先和甲方确认哪些内容？"></textarea>
                   </div>
-
-                  <div class="model-panel">
-                    <div class="model-head">
-                      <label class="label" for="modelSelect">LLM 大模型</label>
-                      <button class="text-button compact-link" id="toggleDirectConfigButton" type="button">收起配置</button>
-                    </div>
-                    <select id="modelSelect"></select>
-                    <div id="modelHint" class="model-hint"></div>
-
-                    <div id="directConfigPanel" class="direct-config-panel">
-                      <label>
-                        <span>常用模型</span>
-                        <select id="directPresetSelect">
-                          <option value="">手动填写</option>
-                          <option value="MiniMax-M3" data-base-url="https://api.minimaxi.com/v1">MiniMax M3（国内平台）</option>
-                          <option value="MiniMax-M3" data-base-url="https://api.minimax.io/v1">MiniMax M3（国际平台）</option>
-                          <option value="deepseek-chat" data-base-url="https://api.deepseek.com/v1">DeepSeek Chat</option>
-                          <option value="qwen-plus" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">通义千问 qwen-plus</option>
-                          <option value="gpt-4o-mini" data-base-url="https://api.openai.com/v1">OpenAI gpt-4o-mini</option>
-                        </select>
-                      </label>
-                      <label>
-                        <span>Base URL</span>
-                        <input id="directBaseUrlInput" class="text-input" placeholder="例如 https://api.deepseek.com/v1" />
-                      </label>
-                      <label>
-                        <span>API Key</span>
-                        <input id="directApiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="只保存到本机后端，接口不会明文回显" />
-                      </label>
-                      <label>
-                        <span>模型名</span>
-                        <input id="directModelInput" class="text-input" placeholder="例如 deepseek-chat / qwen-plus" />
-                      </label>
-                      <div class="config-actions compact-actions">
-                        <button class="btn-ghost" id="saveDirectConfigButton" type="button">
-                          <i data-lucide="save"></i>
-                          保存配置
-                        </button>
-                        <button class="btn-ghost" id="testDirectConfigButton" type="button">
-                          <i data-lucide="activity"></i>
-                          测试配置
-                        </button>
-                      </div>
-                      <div id="directConfigNotice" class="model-hint"></div>
-                    </div>
-                  </div>
                 </div>
 
                 <div class="ask-footer">
+                  <div class="model-info">当前 LLM 对比模型：<strong id="activeModelName">未配置</strong></div>
                   <label class="toggle">
                     <input id="refreshUrlsToggle" type="checkbox" checked />
                     <span>回答前刷新 URL 源</span>
@@ -214,9 +169,89 @@
               </section>
             </section>
           </div>
-
-          <div class="footer-note">@copyright 上海维睿塔数字科技 RAG开发环境</div>
         </section>
+
+        <section id="modelPage" class="page">
+          <div class="topbar">
+            <div>
+              <div class="crumb">工作台 / 模型配置</div>
+              <h1>模型配置</h1>
+            </div>
+            <div class="top-actions">
+              <span class="status-pill"><span class="status-dot"></span>配置已生效</span>
+              <button class="btn-ghost" data-page-target="qaPage" type="button">返回问答</button>
+            </div>
+          </div>
+
+          <div class="grid model-config-grid">
+            <section class="card config-card">
+              <div class="card-title">
+                <div>
+                  <h2>LLM 对比通道</h2>
+                  <p class="desc">配置用于右侧“LLM 大模型回答”的外部模型通道。这里保存后，问答页只显示当前模型摘要。</p>
+                </div>
+                <button class="text-button compact-link" id="toggleDirectConfigButton" type="button">收起配置</button>
+              </div>
+
+              <div class="config-row">
+                <label>
+                  <span class="label">常用模型</span>
+                  <select id="directPresetSelect">
+                    <option value="">手动填写</option>
+                    <option value="MiniMax-M3" data-base-url="https://api.minimaxi.com/v1">MiniMax M3（国内平台）</option>
+                    <option value="MiniMax-M3" data-base-url="https://api.minimax.io/v1">MiniMax M3（国际平台）</option>
+                    <option value="deepseek-chat" data-base-url="https://api.deepseek.com/v1">DeepSeek Chat</option>
+                    <option value="qwen-plus" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">通义千问 qwen-plus</option>
+                    <option value="gpt-4o-mini" data-base-url="https://api.openai.com/v1">OpenAI gpt-4o-mini</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="label">当前模型</span>
+                  <select id="modelSelect"></select>
+                </label>
+                <label>
+                  <span class="label">模型名</span>
+                  <input id="directModelInput" class="text-input" placeholder="例如 deepseek-chat / qwen-plus" />
+                </label>
+              </div>
+
+              <div id="directConfigPanel" class="direct-config-panel model-config-panel">
+                <label>
+                  <span>Base URL</span>
+                  <input id="directBaseUrlInput" class="text-input" placeholder="例如 https://api.deepseek.com/v1" />
+                </label>
+                <label>
+                  <span>API Key</span>
+                  <input id="directApiKeyInput" class="text-input" type="password" autocomplete="off" placeholder="只保存到本机后端，接口不会明文回显" />
+                </label>
+                <div class="config-actions">
+                  <button class="btn-primary" id="saveDirectConfigButton" type="button">
+                    <i data-lucide="save"></i>
+                    保存配置
+                  </button>
+                  <button class="btn-ghost" id="testDirectConfigButton" type="button">
+                    <i data-lucide="activity"></i>
+                    测试配置
+                  </button>
+                </div>
+                <div id="modelHint" class="model-hint"></div>
+                <div id="directConfigNotice" class="model-hint"></div>
+              </div>
+            </section>
+
+            <section class="card config-card">
+              <div class="card-title">
+                <div>
+                  <h2>RAG 服务配置</h2>
+                  <p class="desc">RAG 服务、数据集、会话和密钥属于后台配置。当前页面只负责 LLM 对比通道。</p>
+                </div>
+                <a class="btn-soft" href="./admin.html">进入后台配置</a>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <div class="footer-note">@copyright 上海维睿塔数字科技 RAG开发环境</div>
       </main>
     </section>
   </body>

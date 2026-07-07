@@ -47,7 +47,8 @@ const els = {
   references: document.querySelector("#references"),
   sourceCountMetric: document.querySelector("#sourceCountMetric"),
   readyCountMetric: document.querySelector("#readyCountMetric"),
-  modelMetric: document.querySelector("#modelMetric")
+  modelMetric: document.querySelector("#modelMetric"),
+  activeModelName: document.querySelector("#activeModelName")
 };
 
 function createIcons() {
@@ -249,6 +250,7 @@ function renderSettings() {
     ? `LLM大模型已配置：${escapeHtml(state.settings.directModel)}。下方可以随时更换 Base URL、API Key 或模型名。`
     : `未配置 LLM大模型。RAG 左栏仍可用；右栏需要先在这里填 API Key、Base URL 和模型名。`;
   if (els.modelMetric) els.modelMetric.textContent = state.settings?.directModel || "未配置";
+  if (els.activeModelName) els.activeModelName.textContent = state.settings?.directModel || "未配置";
 }
 
 async function loadSettings() {
@@ -559,6 +561,37 @@ async function logout() {
   window.location.href = "./login.html";
 }
 
+function showWorkspacePage(pageId, options = {}) {
+  const updateHash = options.updateHash !== false;
+  const pages = [...document.querySelectorAll(".app-body .page")];
+  const target = document.querySelector(`#${pageId}`) || document.querySelector("#qaPage");
+  if (!target) return;
+
+  for (const page of pages) {
+    page.classList.toggle("active", page === target);
+  }
+
+  document.querySelectorAll("[data-page-target]").forEach((control) => {
+    control.classList.toggle("active", control.dataset.pageTarget === target.id);
+  });
+
+  if (updateHash) {
+    const hash = target.id === "modelPage" ? "#model" : "#qa";
+    history.replaceState(null, "", hash);
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function setupWorkspacePages() {
+  document.querySelectorAll("[data-page-target]").forEach((control) => {
+    control.addEventListener("click", () => showWorkspacePage(control.dataset.pageTarget));
+  });
+
+  const initialPage = location.hash === "#model" || location.hash === "#modelPage" ? "modelPage" : "qaPage";
+  showWorkspacePage(initialPage, { updateHash: false });
+}
+
 function setupImportTabs() {
   const tabs = [...document.querySelectorAll("[data-import-tab]")];
   const sections = {
@@ -623,6 +656,7 @@ els.dropZone.addEventListener("drop", (event) => {
   addPendingFiles(event.dataTransfer.files);
 });
 
+setupWorkspacePages();
 setupImportTabs();
 createIcons();
 renderSelectedFiles();
