@@ -49,6 +49,30 @@ function Wait-Http {
   return $false
 }
 
+function Wait-DockerHealth {
+  param(
+    [string]$ContainerName,
+    [int]$TimeoutSeconds = 120
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    $status = docker inspect -f "{{.State.Health.Status}}" $ContainerName 2>$null
+    if ($status -eq "healthy") {
+      return $true
+    }
+    if ($status -eq "") {
+      $running = docker inspect -f "{{.State.Running}}" $ContainerName 2>$null
+      if ($running -eq "true") {
+        return $true
+      }
+    }
+    Start-Sleep -Seconds 3
+  } while ((Get-Date) -lt $deadline)
+
+  return $false
+}
+
 function Test-DockerReady {
   try {
     docker info *> $null
@@ -91,13 +115,27 @@ function Start-Ragflow {
   Write-Step "Starting RAGFlow Docker services..."
   Push-Location $RagflowDir
   try {
+    docker compose up -d es01
+    if (!(Wait-DockerHealth -ContainerName "docker-es01-1" -TimeoutSeconds 120)) {
+      throw "Elasticsearch container did not become healthy."
+    }
     docker compose --profile cpu up -d
   } finally {
     Pop-Location
   }
 
   if (!(Wait-Http -Url $RagflowApiUrl -TimeoutSeconds 90)) {
-    Write-Step "RAGFlow API is not responding yet, but Docker start command has completed."
+    Write-Step "RAGFlow API is not responding yet. Restarting ragflow-cpu once..."
+    Push-Location $RagflowDir
+    try {
+      docker compose --profile cpu restart ragflow-cpu
+    } finally {
+      Pop-Location
+    }
+  }
+
+  if (!(Wait-Http -Url $RagflowApiUrl -TimeoutSeconds 120)) {
+    Write-Step "RAGFlow API is not responding yet, but Docker services are running."
   } else {
     Write-Step "RAGFlow API is responding: $RagflowApiUrl"
   }

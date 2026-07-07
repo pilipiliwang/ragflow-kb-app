@@ -5,6 +5,7 @@ node_modules/
 data/*.sqlite
 data/*.sqlite-*
 data/*.log
+data/logs/
 npm-debug.log*
 .DS_Store
 coverage/
